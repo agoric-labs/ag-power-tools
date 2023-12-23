@@ -118,6 +118,7 @@ test('deliver payment using address', async t => {
     const result = await E(seat).getOfferResult();
     t.is(result, 'sent Invitation, Payment');
     t.deepEqual(rxd, [pmt1, pmt2, pmt3]);
+    const done = await E(seat).getPayouts();
   }
 });
 test.todo('partial failure: send N+1 payments where >= 1 delivery fails');
