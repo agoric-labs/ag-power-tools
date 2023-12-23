@@ -75,3 +75,19 @@ export const startVstoreShop = async (powers, config = {}) => {
   );
   produceInstance.resolve(started.instance);
 };
+
+export const permit = {
+  consume: { zoe: true, chainStorage: true },
+  issuer: {
+    consume: { IST: true },
+  },
+  brand: {
+    consume: { IST: true },
+  },
+  installation: {
+    produce: { [contractName]: true },
+  },
+  instance: {
+    produce: { [contractName]: true },
+  },
+};
