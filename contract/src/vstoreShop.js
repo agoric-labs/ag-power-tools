@@ -3,10 +3,11 @@
 import { AmountMath } from '@agoric/ertp/src/amountMath.js';
 import { E, Far } from '@endo/far';
 import { M } from '@endo/patterns';
+import { atomicRearrange } from '@agoric/zoe/src/contractSupport/index.js';
 
 const { Fail } = assert;
 
-/** @type {ContractMeta} */
+/** @type {import('./types').ContractMeta} */
 export const meta = {
   privateArgsShape: harden({ storageNode: M.remotable() }),
 };
@@ -39,7 +40,7 @@ export const start = (zcf, privateArgs) => {
     AmountMath.isGTE(give.Payment, basePrice) ||
       Fail`Payment too low @@TODO detail`;
 
-    zcf.atomicRearrange([[seat, fees, give]]);
+    atomicRearrange(zcf, harden([[seat, fees, give]]));
 
     // IDEA: wrap storage node; charge on each call
     // TODO: constrain slug
@@ -60,7 +61,7 @@ export const start = (zcf, privateArgs) => {
 
   const collectFeesHook = async seat => {
     const alloc = fees.getCurrentAllocation();
-    zcf.atomicRearrange([[fees, seat, alloc]]);
+    atomicRearrange(zcf, harden([[fees, seat, alloc]]));
     seat.exit();
     return alloc;
   };

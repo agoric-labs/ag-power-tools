@@ -5,8 +5,8 @@ import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js'
 import { setUpZoeForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import { E } from '@endo/far';
 import { makeIssuerKit } from '@agoric/ertp';
-import { withAmountUtils } from '@agoric/inter-protocol/test/supports.js';
 import { makeFakeStorageKit } from '@agoric/internal/src/storage-test-utils.js';
+import { withAmountUtils } from './ertp-aux.js';
 
 /** @type {import('ava').TestFn<Awaited<ReturnType<makeTestContext>>>} */
 const test = anyTest;
@@ -23,7 +23,7 @@ const makeTestContext = async () => {
 
   const { zoe } = await setUpZoeForTest();
 
-  /** @type {Installation<import('../src/vstoreShop').start>} */
+  /** @type {Installation<import('../src/vstoreShop.js').start>} */
   const installation = await E(zoe).install(
     await bundleCache.load(assets.vstoreShop, 'vstoreShop'),
   );
