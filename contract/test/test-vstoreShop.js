@@ -8,10 +8,11 @@ import { makeFakeStorageKit } from '@agoric/internal/src/storage-test-utils.js';
 import { makePromiseSpace, makeNameHubKit } from '@agoric/vats';
 import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
 import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
-import { makeZoeForTest } from '@agoric/zoe/tools/setup-zoe.js';
+import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import { withAmountUtils } from './ertp-aux.js';
 
 import { contractName, startVstoreShop } from '../src/start-vstoreShop.js';
+import { makeStableFaucet } from './mintStable.js';
 
 /** @type {import('ava').TestFn<Awaited<ReturnType<makeTestContext>>>} */
 const test = anyTest;
@@ -25,7 +26,7 @@ const assets = {
 const makeTestContext = async () => {
   const bundleCache = await makeNodeBundleCache('bundles/', {}, s => import(s));
 
-  const zoe = await makeZoeForTest();
+  const { zoeService: zoe } = await makeZoeKitForTest();
 
   /** @type {Installation<import('../src/vstoreShop.js').start>} */
   const installation = await E(zoe).install(
@@ -86,17 +87,18 @@ test('buy and write to storage', async t => {
 
 /**
  * Mock enough powers for startVstoreShop permit.
+ * Plus access to load bundles, peek at vstorage, and mint IST.
  *
  * @param {(...args: unknown[]) => void} log
  */
 const mockBootstrap = async log => {
   const { produce, consume } = makePromiseSpace();
   const { admin, vatAdminState } = makeFakeVatAdmin();
-  const zoe = makeZoeForTest(admin);
+  const { zoeService: zoe, feeMintAccess } = makeZoeKitForTest(admin);
   const feeIssuer = await E(zoe).getFeeIssuer();
   const feeBrand = await E(feeIssuer).getBrand();
 
-  const { rootNode: chainStorage, data } = makeFakeStorageKit('X');
+  const { rootNode: chainStorage, data } = makeFakeStorageKit('published');
 
   const { nameHub: agoricNames, nameAdmin: agoricNamesAdmin } =
     makeNameHubKit();
@@ -108,6 +110,7 @@ const mockBootstrap = async log => {
   ]);
 
   produce.zoe.resolve(zoe);
+  produce.feeMintAccess.resolve(feeMintAccess);
   produce.chainStorage.resolve(chainStorage);
   spaces.issuer.produce.IST.resolve(feeIssuer);
   spaces.brand.produce.IST.resolve(feeBrand);
@@ -116,7 +119,7 @@ const mockBootstrap = async log => {
   return { powers, vatAdminState, vstorageData: data };
 };
 
-test('start contract from bootstrap', async t => {
+test('start vstoreShop contract from bootstrap', async t => {
   t.log('bootstrap');
   const { powers, vatAdminState, vstorageData } = await mockBootstrap(t.log);
 
@@ -132,13 +135,18 @@ test('start contract from bootstrap', async t => {
 
   const { zoe } = powers.consume;
   const { [contractName]: instanceP } = powers.instance.consume;
-  const { IST: istIssuerP } = powers.issuer.consume;
-  const ap = E(istIssuerP).makeEmptyPurse();
-  //   ap.deposit(money.mint.mintPayment(money.units(10)));
-  await alice(zoe, instanceP, ap);
 
-  t.deepEqual(
-    [...vstorageData.entries()],
-    [['X.alice-info', '{"blockHeight":"0","values":["Hello, world!"]}']],
-  );
+  const { feeMintAccess } = powers.consume;
+  const { faucet } = makeStableFaucet({ bundleCache, feeMintAccess, zoe });
+  const stableValue = BigInt(contractOpts.priceUnits * 3);
+  const alicePurse = await faucet(stableValue * 1_000_000n);
+  t.log('alice starts with', stableValue, 'IST');
+  await alice(zoe, instanceP, alicePurse);
+
+  const actual = Object.fromEntries([...vstorageData.entries()]);
+  t.log('storage after alice', actual);
+  t.deepEqual(actual, {
+    'published.vstoreShop.alice-info':
+      '{"blockHeight":"0","values":["Hello, world!"]}',
+  });
 });
