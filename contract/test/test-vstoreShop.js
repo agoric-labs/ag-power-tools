@@ -1,6 +1,6 @@
 // @ts-check
 import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
-import path from 'path';
+import { createRequire } from 'node:module';
 import { E } from '@endo/far';
 import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
 import { setUpZoeForTest } from '@agoric/zoe/tools/setup-zoe.js';
@@ -11,11 +11,10 @@ import { withAmountUtils } from './ertp-aux.js';
 /** @type {import('ava').TestFn<Awaited<ReturnType<makeTestContext>>>} */
 const test = anyTest;
 
-const pathname = new URL(import.meta.url).pathname;
-const dirname = path.dirname(pathname);
+const myRequire = createRequire(import.meta.url);
 
 const assets = {
-  vstoreShop: `${dirname}/../src/vstoreShop.js`,
+  vstoreShop: myRequire.resolve('../src/vstoreShop.js'),
 };
 
 const makeTestContext = async () => {
