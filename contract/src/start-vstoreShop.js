@@ -32,6 +32,7 @@ const units = (brand, n, decimalPlaces) =>
  * @param {{ options?: { vstoreShop?: { bundleID?: string, priceUnits }}}} [config]
  */
 export const startVstoreShop = async (powers, config = {}) => {
+  console.log('startVstoreShop() ...');
   const { bundleID = Fail`missing bundleID`, priceUnits = 50 } =
     config.options?.vstoreShop || {};
   const {
@@ -57,6 +58,8 @@ export const startVstoreShop = async (powers, config = {}) => {
     storageNode: E(chainStorage).makeChildNode(contractName),
     istIssuer: istIssuerP,
   });
+  console.log(contractName, { installation, storageNode });
+
   const {
     istBrand,
     displayInfo: { decimalPlaces },
@@ -74,6 +77,7 @@ export const startVstoreShop = async (powers, config = {}) => {
     { storageNode },
   );
   produceInstance.resolve(started.instance);
+  console.log(contractName, started);
 };
 
 export const permit = {
