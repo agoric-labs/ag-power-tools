@@ -1,9 +1,9 @@
 // @ts-check
 import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import path from 'path';
-import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
-import { setUpZoeForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import { E } from '@endo/far';
+import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
+import { setUpZoeForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import { makeIssuerKit } from '@agoric/ertp';
 import { makeFakeStorageKit } from '@agoric/internal/src/storage-test-utils.js';
 import { withAmountUtils } from './ertp-aux.js';
@@ -19,7 +19,7 @@ const assets = {
 };
 
 const makeTestContext = async () => {
-  const bundleCache = await unsafeMakeBundleCache('bundles/');
+  const bundleCache = await makeNodeBundleCache('bundles/', {}, s => import(s));
 
   const { zoe } = await setUpZoeForTest();
 
