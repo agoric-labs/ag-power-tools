@@ -45,6 +45,7 @@ export const start = zcf => {
           Promise.resolve(pmtP).then(pmt => E(depositFacet).receive(pmt)),
         ),
       );
+      seat.exit();
       return `sent ${keys(payouts).join(', ')}`;
     };
 
