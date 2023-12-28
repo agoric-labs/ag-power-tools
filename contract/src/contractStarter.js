@@ -18,13 +18,17 @@
  *   - adminFacet is NOT SAVED. UPGRADE IS IMPOSSIBLE
  *   - smartWallet provides no effective way to provide privateArgs
  */
+// @ts-check
 
 import { E, Far } from '@endo/far';
 import { M, mustMatch } from '@endo/patterns';
-import { InstallationShape, IssuerRecordShape } from '../../typeGuards.js';
-import { depositToSeat } from '../../contractSupport/zoeHelpers.js';
+import {
+  InstallationShape,
+  IssuerRecordShape,
+} from '@agoric/zoe/src/typeGuards.js';
+import { depositToSeat } from '@agoric/zoe/src/contractSupport/zoeHelpers.js';
 
-/** @template SF @typedef {import('../../zoeService/utils').StartParams<SF>} StartParams<SF> */
+/** @template SF @typedef {import('@agoric/zoe/src/zoeService/utils').StartParams<SF>} StartParams<SF> */
 
 const { Fail } = assert;
 
@@ -35,7 +39,10 @@ const { Fail } = assert;
  * @see {ZoeService.startInstance}
  */
 export const StartOptionsShape = M.and(
-  M.or({ bundleID: M.string() }, { installation: InstallationShape }),
+  M.or(
+    M.splitRecord({ bundleID: M.string() }),
+    M.splitRecord({ installation: InstallationShape }),
+  ),
   M.partial({
     issuerKeywordRecord: IssuerRecordShape,
     customTerms: M.any(),
@@ -80,7 +87,7 @@ export const start = (zcf, _privateArgs, _baggage) => {
    * of a user's invitation purse, this will
    * make the instance and installation visible in vstorage.
    *
-   * @template {import('../../zoeService/utils').ContractStartFunction} SF
+   * @template {import('@agoric/zoe/src/zoeService/utils').ContractStartFunction} SF
    * @param {StartOptions<SF>} opts
    */
   const makeStartInvitation = async opts => {

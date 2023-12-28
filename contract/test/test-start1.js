@@ -1,133 +1,89 @@
 // @ts-check
 import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
-import { E } from '@endo/far';
-import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
+import { AmountMath, AssetKind } from '@agoric/ertp';
 import { createRequire } from 'module';
-import { makeZoeKitForTest } from '../../../../tools/setup-zoe';
-import { makeTestBootPowers } from './boot-tools.js';
-import { makeFakeVatAdmin } from '../../../../tools/fakeVatAdmin.js';
+import {
+  bootAndInstallBundles,
+  getBundleId,
+  makeBundleCacheContext,
+} from './boot-tools.js';
+import {
+  installContractStarter,
+  startContractStarter,
+} from '../src/start-contractStarter.js';
+import { mockWalletFactory } from './wallet-tools.js';
+import { receiverRose, senderContract, starterSam } from './market-actors.js';
+
+/** @typedef {import('../src/start-contractStarter.js').ContractStarterPowers} ContractStarterPowers */
 
 const myRequire = createRequire(import.meta.url);
 
-const { Fail } = assert;
-
-const idOf = b => `b1-${b.endoZipBase64Sha512}`;
-
-/** @type {import('ava').TestFn<Awaited<ReturnType<makeTestContext>>>} */
-const test = anyTest;
-
-const makeTestContext = async t => {
-  const bundleCache = await makeNodeBundleCache('bundles/', {}, s => import(s));
-  const { admin, vatAdminState } = makeFakeVatAdmin();
-  const { zoeService } = makeZoeKitForTest(admin);
-  const { bundles, powers } = await makeTestBootPowers(
-    t,
-    zoeService,
-    bundleCache,
-  );
-
-  for (const [n, b] of Object.entries(bundles)) {
-    vatAdminState.installBundle(idOf(b), b);
-  }
-  return { bundles, powers };
+const assets = {
+  contractStarter: myRequire.resolve('../src/contractStarter.js'),
+  postalSvc: myRequire.resolve('../src/postalSvc.js'),
 };
 
-test.before(async t => (t.context = await makeTestContext(t)));
+/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
+const test = anyTest;
+
+test.before(async t => (t.context = await makeBundleCacheContext(t)));
 
 test('use contractStarter to start postalSvc', async t => {
-  const { powers, bundles } = t.context;
-
-  /**
-   * @param {BootstrapPowers} powers
-   * @param {{options?: { contractStarter?: { bundleID?: string }}}} [config]
-   */
-  const installContractStarter = async (
-    {
-      consume: { zoe },
-      installation: {
-        produce: { contractStarter: produceInstallation },
-      },
-    },
-    { options } = {},
-  ) => {
-    const {
-      // rendering this template requires not re-flowing the next line
-      bundleID = Fail(`bundleID required`),
-    } = options?.contractStarter || {};
-
-    const installation = await E(zoe).installBundleID(bundleID);
-    produceInstallation.reset();
-    produceInstallation.resolve(installation);
-    t.log('contractStarter installed', installation);
+  const { powers: powers0, bundles } = await bootAndInstallBundles(t, assets);
+  const id = {
+    contractStarter: { bundleID: getBundleId(bundles.contractStarter) },
+    postalSvc: { bundleID: getBundleId(bundles.postalSvc) },
   };
-
-  /**
-   * @param {BootstrapPowers} powers
-   * @param {{options?: { bundleID?: string }}} [_config]
-   */
-  const startContractStarter = async (
-    {
-      consume: { zoe },
-      produce: { contractStarterStartResult },
-      installation: {
-        consume: { contractStarter: consumeInstallation },
-      },
-      instance: {
-        produce: { contractStarter: produceInstance },
-      },
-    },
-    _config,
-  ) => {
-    const installation = await consumeInstallation;
-
-    const invitationIssuer = await E(zoe).getInvitationIssuer();
-    const startResult = await E(zoe).startInstance(installation, {
-      Invitation: invitationIssuer,
-    });
-    contractStarterStartResult.resolve(startResult);
-    const { instance } = startResult;
-    produceInstance.resolve(instance);
-
-    t.log('contractStarter started', instance);
-  };
+  /** @type { typeof powers0 & ContractStarterPowers} */
+  // @ts-expect-error bootstrap powers evolve with BLD staker governance
+  const powers = powers0;
 
   await installContractStarter(powers, {
-    options: { contractStarter: { bundleID: idOf(bundles.contractStarter) } },
+    options: { contractStarter: id.contractStarter },
   });
   await startContractStarter(powers, {});
 
-  /** @typedef { typeof import('../../../../src/contracts/gimix/contractStarter.js').start } ContractStarterFn */
-  /** @type { StartedInstanceKit<ContractStarterFn>['instance'] } */
-  const instance = await powers.instance.consume.contractStarter;
-  t.truthy(instance);
-  const { zoe } = powers.consume;
-  const pf = E(zoe).getPublicFacet(instance);
+  const brand = {
+    Invitation: await powers.brand.consume.Invitation,
+  };
+  /** @type {import('./market-actors.js').WellKnownK} */
+  const wellKnown = {
+    installation: powers.installation.consume,
+    instance: powers.instance.consume,
+    issuer: powers.issuer.consume,
+    brand: powers.brand.consume,
+    assetKind: new Map(
+      /** @type {[Brand, AssetKind][]} */ ([[brand.Invitation, AssetKind.SET]]),
+    ),
+  };
 
-  const toStart = await E(pf).makeStartInvitation({
-    bundleID: idOf(bundles.postalSvc),
-  });
-  t.log('invitation toStart', toStart);
+  const {
+    zoe,
+    namesByAddress: nbaP,
+    namesByAddressAdmin,
+    chainStorage,
+  } = powers.consume;
+  const namesByAddress = await nbaP;
+  const walletFactory = mockWalletFactory(
+    { zoe, namesByAddressAdmin, chainStorage },
+    { Invitation: await wellKnown.issuer.Invitation },
+  );
 
-  const seat = E(zoe).offer(toStart);
-  const result = await E(seat).getOfferResult();
-  t.deepEqual(Object.keys(result), ['invitationMakers']);
-  const payouts = await E(seat).getPayouts();
-  t.deepEqual(Object.keys(payouts), ['Started']);
-  const pmt = await payouts.Started;
-  const invitationIssuer = await E(zoe).getInvitationIssuer();
-  const amt = await E(invitationIssuer).getAmountOf(pmt);
-  const invitationBrand = await E(invitationIssuer).getBrand();
-  t.is(amt.brand, invitationBrand);
-  t.true(Array.isArray(amt.value));
-  t.is(amt.value.length, 1);
-  const [info] = amt.value;
-  t.deepEqual(Object.keys(info), [
-    'customDetails',
-    'description',
-    'handle',
-    'installation',
-    'instance',
+  const shared = { destAddr: 'agoric1receiverRoseStart' };
+  const wallet = {
+    sam: await walletFactory.makeSmartWallet('agoric1senderSamStart'),
+    rose: await walletFactory.makeSmartWallet(shared.destAddr),
+  };
+  const toSend = { ToDoEmpty: AmountMath.make(brand.Invitation, harden([])) };
+  await Promise.all([
+    starterSam(
+      t,
+      { wallet: wallet.sam, ...id.postalSvc, namesByAddress },
+      wellKnown,
+    ).then(({ instance: postalSvc }) => {
+      const terms = { postalSvc, destAddr: shared.destAddr };
+      senderContract(t, { zoe, terms });
+    }),
+    receiverRose(t, { wallet: wallet.rose }, wellKnown, { toSend }),
   ]);
-  t.is(info.instance, instance);
-  t.log(info.customDetails);
 });
