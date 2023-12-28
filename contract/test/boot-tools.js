@@ -13,13 +13,12 @@ const myRequire = createRequire(import.meta.url);
  * @param {BundleCache} bundleCache
  */
 const loadBundles = async bundleCache => {
-  const dir1 = '../../../../src/contracts/gimix';
+  const dir1 = '../src';
   const load1 = name =>
     bundleCache.load(myRequire.resolve(`${dir1}/${name}.js`), name);
   const bundles = {
     contractStarter: await load1('contractStarter'),
     postalSvc: await load1('postalSvc'),
-    terminalIncarnation: await load1('terminalIncarnation'),
   };
   return bundles;
 };

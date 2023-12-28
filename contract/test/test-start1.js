@@ -3,9 +3,9 @@ import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { E } from '@endo/far';
 import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
 import { createRequire } from 'module';
-import { makeZoeKitForTest } from '../../../../tools/setup-zoe';
+import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
+import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
 import { makeTestBootPowers } from './boot-tools.js';
-import { makeFakeVatAdmin } from '../../../../tools/fakeVatAdmin.js';
 
 const myRequire = createRequire(import.meta.url);
 
@@ -96,7 +96,7 @@ test('use contractStarter to start postalSvc', async t => {
   });
   await startContractStarter(powers, {});
 
-  /** @typedef { typeof import('../../../../src/contracts/gimix/contractStarter.js').start } ContractStarterFn */
+  /** @typedef { typeof import('../src/contractStarter.js').start } ContractStarterFn */
   /** @type { StartedInstanceKit<ContractStarterFn>['instance'] } */
   const instance = await powers.instance.consume.contractStarter;
   t.truthy(instance);
