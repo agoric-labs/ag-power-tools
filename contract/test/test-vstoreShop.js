@@ -1,5 +1,5 @@
 // @ts-check
-import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
+import { test as anyTest } from './prepare-test-env-ava.js';
 import { createRequire } from 'node:module';
 import { E } from '@endo/far';
 import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
