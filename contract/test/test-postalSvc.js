@@ -6,15 +6,12 @@ import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { createRequire } from 'module';
 
 import { E, Far } from '@endo/far';
-import { unsafeMakeBundleCache } from '@agoric/swingset-vat/tools/bundleTool.js';
-import { makeNameHubKit, makePromiseSpace } from '@agoric/vats';
-import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
+import { makeNameHubKit } from '@agoric/vats';
 import { AmountMath } from '@agoric/ertp/src/amountMath.js';
-import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
-import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import { startPostalSvc } from '../src/start-postalSvc.js';
+import { makeBootstrapPowers, makeBundleCacheContext } from './boot-tools.js';
 
-/** @type {import('ava').TestFn<Awaited<ReturnType<makeTestContext>>>} */
+/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
 const test = anyTest;
 
 const myRequire = createRequire(import.meta.url);
@@ -23,44 +20,11 @@ const assets = {
   postalSvc: myRequire.resolve('../src/postalSvc.js'),
 };
 
-const makeTestContext = async t => {
-  const bundleCache = await unsafeMakeBundleCache('bundles/');
-
-  return { bundleCache };
-};
-
-test.before(async t => (t.context = await makeTestContext(t)));
-
-const bootstrap = async log => {
-  const { produce, consume } = makePromiseSpace();
-
-  const { admin, vatAdminState } = makeFakeVatAdmin();
-  const { zoeService: zoe, feeMintAccess } = makeZoeKitForTest(admin);
-
-  const { nameHub: agoricNames, nameAdmin: agoricNamesAdmin } =
-    makeNameHubKit();
-  const spaces = await makeWellKnownSpaces(agoricNamesAdmin, log, [
-    'installation',
-    'instance',
-  ]);
-
-  const { nameAdmin: namesByAddressAdmin } = makeNameHubKit();
-
-  produce.zoe.resolve(zoe);
-  produce.feeMintAccess.resolve(feeMintAccess);
-  produce.agoricNames.resolve(agoricNames);
-  produce.namesByAddressAdmin.resolve(namesByAddressAdmin);
-
-  /** @type {BootstrapPowers}}  */
-  // @ts-expect-error mock
-  const powers = { produce, consume, ...spaces };
-
-  return { powers, vatAdminState };
-};
+test.before(async t => (t.context = await makeBundleCacheContext(t)));
 
 test('deliver payment using address', async t => {
   t.log('bootstrap');
-  const { powers, vatAdminState } = await bootstrap(t.log);
+  const { powers, vatAdminState } = await makeBootstrapPowers(t.log);
 
   const { bundleCache } = t.context;
   const bundle = await bundleCache.load(assets.postalSvc, 'postalSvc');
