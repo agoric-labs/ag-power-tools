@@ -22,6 +22,7 @@
   "devDependencies": {
     "@agoric/deploy-script-support": "^0.10.4-u12.0",
     "@agoric/smart-wallet": "^0.5.4-u12.0",
+    "@agoric/store": "^0.9.3-u12.0",
     "@agoric/vats": "^0.15.2-u12.0",
     "@endo/bundle-source": "^2.8.0",
     "@endo/eslint-plugin": "^0.5.2",
