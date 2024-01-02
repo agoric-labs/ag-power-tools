@@ -84,16 +84,46 @@ test.serial('launch a token', async t => {
    * @param {import('./wallet-tools.js').MockWallet} wallet
    */
   const cathy = async (wellKnown, wallet) => {
-    const timerBrand = await wellKnown.brand.consume.timerBrand;
-    const deadline = harden({ timerBrand, absValue: 10n });
-
     /** @type {import('@agoric/smart-wallet').OfferSpec} */
-    const offerSpec = {
-      id: 'launch-1',
+    const mintOfferSpec = {
+      id: 'mint-1',
       invitationSpec: {
         source: 'contract',
         instance: await wellKnown.instance.consume[contractName],
-        publicInvitationMaker: 'createLaunchInvitation',
+        publicInvitationMaker: 'makeMintInvitation',
+      },
+      proposal: { give: {} },
+      offerArgs: { name: 'CDOG', supplyQty: 1_000_000n },
+    };
+
+    t.log('1,000,000 CDOG tokens are minted');
+    const updates = await E(wallet.offers).executeOffer(mintOfferSpec);
+
+    const expected = [
+      { status: { id: mintOfferSpec.id } },
+      { status: { result: 'CDOG' } },
+    ];
+    for await (const selector of expected) {
+      const { value } = await updates.next();
+      // t.log('update ##NN', value);
+      t.log('update ##NN', selector);
+      t.like(value, selector);
+    }
+
+    t.log('CDOG tokens are locked up in a pool');
+    const timerBrand = await wellKnown.brand.consume.timerBrand;
+    const deadline = harden({ timerBrand, absValue: 10n });
+  };
+
+  const albert = async (wellKnown, wallet) => {
+    const instance = await wellKnown.instance.consume[contractName];
+    /** @type {import('@agoric/smart-wallet').OfferSpec} */
+    const offerSpec = {
+      id: 'contribute-2',
+      invitationSpec: {
+        source: 'contract',
+        instance,
+        publicInvitationMaker: 'makeContributeInvitation',
         invitationArgs: [
           {
             name: 'CDOG',
@@ -104,26 +134,7 @@ test.serial('launch a token', async t => {
       },
       proposal: { give: {} },
     };
-
-    t.log('1,000,000 CDOG tokens are minted and locked up in a pool');
-    const updates = await E(wallet.offers).executeOffer(offerSpec);
-
-    const {
-      value: {
-        status: { invitationSpec: _i1, proposal: _p1, ...info1 },
-      },
-    } = await updates.next();
-    t.log('update 1', info1);
-    t.deepEqual(info1.id, offerSpec.id);
-    const {
-      value: {
-        status: { invitationSpec: _i2, proposal: _p2, ...info2 },
-      },
-    } = await updates.next();
-    t.log('update 2', info2);
-    t.deepEqual(info2.result, 'CDOG');
   };
-
   const powers = t.context.shared.powers;
   const wellKnown = {
     instance: powers.instance,
