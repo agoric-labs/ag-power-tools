@@ -1,12 +1,13 @@
 // @ts-check
 
 import { createRequire } from 'module';
-import { Far } from '@endo/far';
+import { E, Far } from '@endo/far';
 import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
 import { makeNameHubKit, makePromiseSpace } from '@agoric/vats';
 import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
 import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
 import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
+import buildManualTimer from '@agoric/zoe/tools/manualTimer.js';
 
 /** @typedef {Awaited<ReturnType<typeof import('@endo/bundle-source/cache.js').makeNodeBundleCache>>} BundleCache */
 
@@ -124,7 +125,7 @@ export const makeTestBootPowers = async (
 
 export const makeBootstrapPowers = async (
   log,
-  spaceNames = ['installation', 'instance'],
+  spaceNames = ['installation', 'instance', 'issuer', 'brand'],
 ) => {
   const { produce, consume } = makePromiseSpace();
 
@@ -137,10 +138,15 @@ export const makeBootstrapPowers = async (
 
   const { nameAdmin: namesByAddressAdmin } = makeNameHubKit();
 
+  const chainTimerService = buildManualTimer();
+  const timerBrand = await E(chainTimerService).getTimerBrand();
+
   produce.zoe.resolve(zoe);
   produce.feeMintAccess.resolve(feeMintAccess);
   produce.agoricNames.resolve(agoricNames);
   produce.namesByAddressAdmin.resolve(namesByAddressAdmin);
+  produce.chainTimerService.resolve(chainTimerService);
+  spaces.brand.produce.timer.resolve(timerBrand);
 
   /** @type {BootstrapPowers}}  */
   // @ts-expect-error mock
@@ -152,5 +158,6 @@ export const makeBootstrapPowers = async (
 export const makeBundleCacheContext = async (_t, dest = 'bundles/') => {
   const bundleCache = await makeNodeBundleCache(dest, {}, s => import(s));
 
-  return { bundleCache };
+  const shared = {};
+  return { bundleCache, shared };
 };
