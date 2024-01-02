@@ -1,9 +1,12 @@
 // @ts-check
 
+import { createRequire } from 'module';
 import { Far } from '@endo/far';
+import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
 import { makeNameHubKit, makePromiseSpace } from '@agoric/vats';
 import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
-import { createRequire } from 'module';
+import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
+import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
 
 /** @typedef {Awaited<ReturnType<typeof import('@endo/bundle-source/cache.js').makeNodeBundleCache>>} BundleCache */
 
@@ -117,4 +120,37 @@ export const makeTestBootPowers = async (
 
   const powers = await bootstrap();
   return { bundles, powers };
+};
+
+export const makeBootstrapPowers = async (
+  log,
+  spaceNames = ['installation', 'instance'],
+) => {
+  const { produce, consume } = makePromiseSpace();
+
+  const { admin, vatAdminState } = makeFakeVatAdmin();
+  const { zoeService: zoe, feeMintAccess } = makeZoeKitForTest(admin);
+
+  const { nameHub: agoricNames, nameAdmin: agoricNamesAdmin } =
+    makeNameHubKit();
+  const spaces = await makeWellKnownSpaces(agoricNamesAdmin, log, spaceNames);
+
+  const { nameAdmin: namesByAddressAdmin } = makeNameHubKit();
+
+  produce.zoe.resolve(zoe);
+  produce.feeMintAccess.resolve(feeMintAccess);
+  produce.agoricNames.resolve(agoricNames);
+  produce.namesByAddressAdmin.resolve(namesByAddressAdmin);
+
+  /** @type {BootstrapPowers}}  */
+  // @ts-expect-error mock
+  const powers = { produce, consume, ...spaces };
+
+  return { powers, vatAdminState };
+};
+
+export const makeBundleCacheContext = async (_t, dest = 'bundles/') => {
+  const bundleCache = await makeNodeBundleCache(dest, {}, s => import(s));
+
+  return { bundleCache };
 };
