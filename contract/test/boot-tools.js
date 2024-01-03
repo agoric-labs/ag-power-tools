@@ -146,7 +146,7 @@ export const makeBootstrapPowers = async (
   produce.agoricNames.resolve(agoricNames);
   produce.namesByAddressAdmin.resolve(namesByAddressAdmin);
   produce.chainTimerService.resolve(chainTimerService);
-  spaces.brand.produce.timerBrand.resolve(timerBrand);
+  spaces.brand.produce.timer.resolve(timerBrand);
 
   /** @type {BootstrapPowers}}  */
   // @ts-expect-error mock
