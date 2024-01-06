@@ -2,7 +2,7 @@
 import { E } from '@endo/far';
 import { ToFarFunction } from '@endo/captp';
 import { makePromiseKit } from '@endo/promise-kit';
-import { makeDurableZone } from '@agoric/zone/durable';
+import { makeDurableZone } from '@agoric/zone/durable.js';
 import { provide } from '@agoric/vat-data';
 import { AmountMath, AssetKind } from '@agoric/ertp/src/amountMath.js';
 import { makeRatio } from '@agoric/zoe/src/contractSupport/index.js';
