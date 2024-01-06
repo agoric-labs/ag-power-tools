@@ -21,6 +21,7 @@
   },
   "devDependencies": {
     "@agoric/deploy-script-support": "^0.10.4-u12.0",
+    "@agoric/inter-protocol": "0.16.2-u12.0",
     "@agoric/smart-wallet": "^0.5.4-u12.0",
     "@agoric/store": "^0.9.3-u12.0",
     "@agoric/vats": "^0.15.2-u12.0",
@@ -56,11 +57,14 @@
   "dependencies": {
     "@agoric/ertp": "^0.16.3-u12.0",
     "@agoric/time": "^0.3.3-u12.0",
+    "@agoric/vat-data": "0.5.2",
     "@agoric/zoe": "^0.26.3-u12.0",
     "@agoric/zone": "^0.2.3-u12.0",
+    "@endo/captp": "3.1.1",
     "@endo/far": "^0.2.22",
     "@endo/marshal": "^0.8.9",
-    "@endo/patterns": "^0.2.5"
+    "@endo/patterns": "^0.2.5",
+    "@endo/promise-kit": "0.2.56"
   },
   "ava": {
     "files": [
