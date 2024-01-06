@@ -9,6 +9,12 @@ import { makeRatio } from '@agoric/zoe/src/contractSupport/index.js';
 
 import { whenQuiescent } from './when-quiescent.js';
 
+console.log('TODO: createPriceFeed from price-feed-proposal');
+console.log('TODO: ensureOracleBrands from price-feed-proposal');
+console.log('TODO: scaledPriceAuthority - or skip it?');
+
+console.log('TODO: startPSM');
+
 /**
  * @typedef {{
  *   startUpgradable: StartUpgradable
