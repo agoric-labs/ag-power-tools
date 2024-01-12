@@ -8,6 +8,7 @@ import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
 import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
 import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import buildManualTimer from '@agoric/zoe/tools/manualTimer.js';
+import { makeFakeStorageKit } from '@agoric/internal/src/storage-test-utils.js';
 
 /** @typedef {Awaited<ReturnType<typeof import('@endo/bundle-source/cache.js').makeNodeBundleCache>>} BundleCache */
 
@@ -131,6 +132,11 @@ export const makeBootstrapPowers = async (
 
   const { admin, vatAdminState } = makeFakeVatAdmin();
   const { zoeService: zoe, feeMintAccess } = makeZoeKitForTest(admin);
+  const invitationIssuer = await E(zoe).getInvitationIssuer();
+  const feeIssuer = await E(zoe).getFeeIssuer();
+  const [invitationBrand, feeBrand] = await Promise.all(
+    [invitationIssuer, feeIssuer].map(i => E(i).getBrand()),
+  );
 
   const { nameHub: agoricNames, nameAdmin: agoricNamesAdmin } =
     makeNameHubKit();
@@ -141,18 +147,25 @@ export const makeBootstrapPowers = async (
   const chainTimerService = buildManualTimer();
   const timerBrand = await E(chainTimerService).getTimerBrand();
 
+  const { rootNode: chainStorage, data } = makeFakeStorageKit('published');
+
   produce.zoe.resolve(zoe);
   produce.feeMintAccess.resolve(feeMintAccess);
   produce.agoricNames.resolve(agoricNames);
   produce.namesByAddressAdmin.resolve(namesByAddressAdmin);
   produce.chainTimerService.resolve(chainTimerService);
+  produce.chainStorage.resolve(chainStorage);
   spaces.brand.produce.timer.resolve(timerBrand);
+  spaces.brand.produce.IST.resolve(feeBrand);
+  spaces.brand.produce.Invitation.resolve(invitationBrand);
+  spaces.issuer.produce.IST.resolve(feeIssuer);
+  spaces.issuer.produce.Invitation.resolve(invitationIssuer);
 
-  /** @type {BootstrapPowers}}  */
+  /** @type {BootstrapPowers & { consume: { chainStorage: Promise<StorageNode> }}}}  */
   // @ts-expect-error mock
   const powers = { produce, consume, ...spaces };
 
-  return { powers, vatAdminState };
+  return { powers, vatAdminState, vstorageState: data };
 };
 
 export const makeBundleCacheContext = async (_t, dest = 'bundles/') => {
