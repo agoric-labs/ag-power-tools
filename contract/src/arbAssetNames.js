@@ -7,6 +7,7 @@ import { E, Far } from '@endo/far';
 import { M, mustMatch } from '@endo/patterns';
 import { AmountShape } from '@agoric/ertp/src/typeGuards.js';
 import { atomicRearrange } from '@agoric/zoe/src/contractSupport/atomicTransfer.js';
+import { getTerms } from './contractMetaAux.js';
 
 const { Fail, quote: q } = assert;
 
@@ -22,11 +23,15 @@ const PublishProposalShape = {
 };
 
 /** @type {import("./types").ContractMeta} */
-const meta = {
+export const meta = harden({
   privateArgsShape: {
     nameAdmins: { issuer: M.remotable(), brand: M.remotable() },
   },
-};
+  customTermsShape: {
+    board: M.remotable('board'),
+    price: AmountShape,
+  },
+});
 
 /**
  *
@@ -42,7 +47,8 @@ const meta = {
  * @param {*} baggage
  */
 export const start = async (zcf, privateArgs, baggage) => {
-  const { board, price } = zcf.getTerms();
+  const { board, price } = getTerms(zcf, meta);
+  mustMatch(privateArgs, meta.privateArgsShape);
   const { nameAdmins } = privateArgs;
 
   /**
