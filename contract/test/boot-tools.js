@@ -2,6 +2,7 @@
 import { E } from '@endo/far';
 import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
 import { makeNameHubKit, makePromiseSpace } from '@agoric/vats';
+import { makeFakeBoard } from '@agoric/vats/tools/board-utils.js';
 import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
 import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
 import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
@@ -36,13 +37,16 @@ export const makeBootstrapPowers = async (
 
   const { rootNode: chainStorage, data } = makeFakeStorageKit('published');
 
+  const board = makeFakeBoard();
   produce.zoe.resolve(zoe);
   produce.feeMintAccess.resolve(feeMintAccess);
+  produce.agoricNamesAdmin.resolve(agoricNamesAdmin);
   produce.agoricNames.resolve(agoricNames);
   produce.namesByAddress.resolve(namesByAddress);
   produce.namesByAddressAdmin.resolve(namesByAddressAdmin);
   produce.chainTimerService.resolve(chainTimerService);
   produce.chainStorage.resolve(chainStorage);
+  produce.board.resolve(board);
   spaces.brand.produce.timer.resolve(timerBrand);
   spaces.brand.produce.IST.resolve(feeBrand);
   spaces.brand.produce.Invitation.resolve(invitationBrand);
