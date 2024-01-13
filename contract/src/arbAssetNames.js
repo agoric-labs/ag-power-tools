@@ -16,11 +16,11 @@ const AssetInfoShape = harden({
   brand: M.remotable('Brand'),
 });
 
-const PublishProposalShape = {
+const PublishProposalShape = harden({
   give: { Pay: AmountShape },
   want: {},
   exit: M.any(),
-};
+});
 
 /** @type {import("./types").ContractMeta} */
 export const meta = harden({
@@ -89,14 +89,19 @@ export const start = async (zcf, privateArgs, baggage) => {
   const { zcfSeat: proceeds } = zcf.makeEmptySeatKit();
   const publishHandler = async (seat, offerArgs) => {
     mustMatch(harden(offerArgs), AssetInfoShape);
-    atomicRearrange(zcf, [[seat, proceeds, { Pay: price }]]);
+    atomicRearrange(zcf, harden([[seat, proceeds, { Pay: price }]]));
     const { issuer, brand } = offerArgs;
     await prepare(issuer, brand);
     const name = await commit(issuer, brand);
     return name;
   };
   const makePublishAssetInvitation = () =>
-    zcf.makeInvitation(publishHandler, 'publishAsset', PublishProposalShape);
+    zcf.makeInvitation(
+      publishHandler,
+      'publishAsset',
+      undefined,
+      PublishProposalShape,
+    );
   const publicFacet = Far('Arb Asset Naming', { makePublishAssetInvitation });
   return { publicFacet };
 };
