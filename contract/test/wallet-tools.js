@@ -1,18 +1,9 @@
 // @ts-check
 import { E, Far } from '@endo/far';
+import { allValues, mapValues } from '../src/objectTools.js';
+export { allValues, mapValues };
 
-const { entries, fromEntries, values } = Object;
-
-/** @type { <T extends Record<string, ERef<any>>>(obj: T) => Promise<{ [K in keyof T]: Awaited<T[K]>}> } */
-export const allValues = async obj => {
-  const es = await Promise.all(
-    entries(obj).map(async ([k, v]) => [k, await v]),
-  );
-  return fromEntries(es);
-};
-/** @type { <V, U, T extends Record<string, V>>(obj: T, f: (v: V) => U) => Record<string, U>} */
-export const mapValues = (obj, f) =>
-  fromEntries(entries(obj).map(([p, v]) => [p, f(v)]));
+const { values } = Object;
 
 /**
  * @param {{
