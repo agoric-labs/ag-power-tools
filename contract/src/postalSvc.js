@@ -1,5 +1,6 @@
 // @ts-check
 import { E, Far } from '@endo/far';
+import { M, mustMatch } from '@endo/patterns';
 import { withdrawFromSeat } from '@agoric/zoe/src/contractSupport/zoeHelpers.js';
 
 const { keys, values } = Object;
@@ -12,6 +13,7 @@ const { keys, values } = Object;
 /** @param {ZCF<PostalSvcTerms>} zcf */
 export const start = zcf => {
   const { namesByAddress, issuers } = zcf.getTerms();
+  mustMatch(namesByAddress, M.remotable('namesByAddress'));
   console.log('postalSvc issuers', Object.keys(issuers));
 
   /**

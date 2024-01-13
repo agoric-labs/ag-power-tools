@@ -4,15 +4,14 @@ import { E, Far } from '@endo/far';
 const { entries, fromEntries, values } = Object;
 
 /** @type { <T extends Record<string, ERef<any>>>(obj: T) => Promise<{ [K in keyof T]: Awaited<T[K]>}> } */
-const allValues = async obj => {
+export const allValues = async obj => {
   const es = await Promise.all(
     entries(obj).map(async ([k, v]) => [k, await v]),
   );
   return fromEntries(es);
 };
-
 /** @type { <V, U, T extends Record<string, V>>(obj: T, f: (v: V) => U) => Record<string, U>} */
-const mapValues = (obj, f) =>
+export const mapValues = (obj, f) =>
   fromEntries(entries(obj).map(([p, v]) => [p, f(v)]));
 
 /**
@@ -32,7 +31,7 @@ export const mockWalletFactory = (
 ) => {
   const DEPOSIT_FACET_KEY = 'depositFacet';
 
-  const { Fail } = assert;
+  const { Fail, quote: q } = assert;
 
   //   const walletsNode = E(chainStorage).makeChildNode('wallet');
 
@@ -107,7 +106,7 @@ export const mockWalletFactory = (
 
     /** @param {OfferSpec} offerSpec */
     async function* executeOffer(offerSpec) {
-      const { invitationSpec, proposal, offerArgs } = offerSpec;
+      const { invitationSpec, proposal = {}, offerArgs } = offerSpec;
       const { source } = invitationSpec;
       const invitation = await (source === 'contract'
         ? getContractInvitation(invitationSpec)
@@ -115,7 +114,7 @@ export const mockWalletFactory = (
         ? getPurseInvitation(invitationSpec)
         : Fail`unsupported source: ${source}`);
       const pmts = await allValues(
-        mapValues(proposal.give, async amt => {
+        mapValues(proposal.give || {}, async amt => {
           const { brand } = amt;
           if (!purseByBrand.has(brand))
             throw Error(`brand not known/supported: ${brand}`);
@@ -126,16 +125,16 @@ export const mockWalletFactory = (
       );
       const seat = await E(zoe).offer(invitation, proposal, pmts, offerArgs);
       //   console.log(address, offerSpec.id, 'got seat');
-      yield { updated: 'OfferStatus', status: offerSpec };
+      yield { updated: 'offerStatus', status: offerSpec };
       const result = await E(seat).getOfferResult();
       //   console.log(address, offerSpec.id, 'got result', result);
-      yield { updated: 'OfferStatus', status: { ...offerSpec, result } };
+      yield { updated: 'offerStatus', status: { ...offerSpec, result } };
       const [payouts, numWantsSatisfied] = await Promise.all([
         E(seat).getPayouts(),
         E(seat).numWantsSatisfied(),
       ]);
       yield {
-        updated: 'OfferStatus',
+        updated: 'offerStatus',
         status: { ...offerSpec, result, numWantsSatisfied },
       };
       const amts = await allValues(
@@ -145,7 +144,7 @@ export const mockWalletFactory = (
       );
       //   console.log(address, offerSpec.id, 'got payouts', amts);
       yield {
-        updated: 'OfferStatus',
+        updated: 'offerStatus',
         status: { ...offerSpec, result, numWantsSatisfied, payouts: amts },
       };
     }
@@ -153,6 +152,12 @@ export const mockWalletFactory = (
     return {
       deposit: depositFacet,
       offers: Far('Offers', { executeOffer, addIssuer }),
+      peek: Far('Wallet Peek', {
+        purseNotifier: brand =>
+          E(
+            purseByBrand.get(brand) || Fail`${q(brand)}`,
+          ).getCurrentAmountNotifier(),
+      }),
     };
   };
 

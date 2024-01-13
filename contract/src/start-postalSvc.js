@@ -18,6 +18,22 @@ const fail = msg => {
 };
 
 /**
+ * @typedef { typeof import('../src/postalSvc.js').start } PostalSvcFn
+ *
+ * @typedef {{
+ *   produce: { postalSvcKit: Producer<unknown> },
+ *   installation: {
+ *     consume: { postalSvc: Promise<Installation<PostalSvcFn>> },
+ *     produce: { postalSvc: Producer<Installation<PostalSvcFn>> },
+ *   }
+ *   instance: {
+ *     consume: { postalSvc: Promise<StartedInstanceKit<PostalSvcFn>['instance']> },
+ *     produce: { postalSvc: Producer<StartedInstanceKit<PostalSvcFn>['instance']> },
+ *   }
+ * }} PostalSvcPowers
+ */
+
+/**
  * ref https://github.com/Agoric/agoric-sdk/issues/8408#issuecomment-1741445458
  *
  * @param {ERef<import('@agoric/vats').NameAdmin>} namesByAddressAdmin
@@ -43,41 +59,40 @@ const fixHub = async namesByAddressAdmin => {
 };
 
 /**
- * @param {BootstrapPowers} powers
+ * @param {BootstrapPowers & PostalSvcPowers} powers
  * @param {{ options?: { postalSvc: {
  *   bundleID: string;
+ *   issuerNames?: string[];
  * }}}} config
  */
 export const startPostalSvc = async (powers, config) => {
   const {
     consume: { zoe, namesByAddressAdmin },
     installation: {
-      // @ts-expect-error not statically known at genesis
       produce: { postalSvc: produceInstallation },
     },
     instance: {
-      // @ts-expect-error not statically known at genesis
       produce: { postalSvc: produceInstance },
     },
+    issuer: { consume: consumeIssuer },
   } = powers;
-  const { bundleID = fail(`no bundleID; try test-gimix-proposal.js?`) } =
-    config.options?.postalSvc ?? {};
+  const {
+    bundleID = fail(`no bundleID`),
+    issuerNames = ['IST', 'Invitation'],
+  } = config.options?.postalSvc ?? {};
 
-  /** @type {Installation<import('./postalSvc').start>} */
+  /** @type {Installation<PostalSvcFn>} */
   const installation = await E(zoe).installBundleID(bundleID);
   produceInstallation.resolve(installation);
 
   const namesByAddress = await fixHub(namesByAddressAdmin);
 
-  const [IST, Invitation] = await Promise.all([
-    E(zoe).getFeeIssuer(),
-    E(zoe).getInvitationIssuer(),
-  ]);
-  const { instance } = await E(zoe).startInstance(
-    installation,
-    { IST, Invitation },
-    { namesByAddress },
+  const issuers = Object.fromEntries(
+    issuerNames.map(n => [n, consumeIssuer[n]]),
   );
+  const { instance } = await E(zoe).startInstance(installation, issuers, {
+    namesByAddress,
+  });
   produceInstance.resolve(instance);
 
   trace('postalSvc started');
