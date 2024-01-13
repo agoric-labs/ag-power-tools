@@ -4,12 +4,12 @@
 import { test as anyTest } from './prepare-test-env-ava.js';
 import { createRequire } from 'module';
 
-import { E } from '@endo/far';
-import { makeNodeBundleCache } from '@endo/bundle-source/cache.js';
-import { makeIssuerKit, AmountMath } from '@agoric/ertp';
-import { makeBootstrapPowers, makeBundleCacheContext } from './boot-tools.js';
-
-/** @typedef {typeof import('../src/arbAssetNames.js').start} ContractFn */
+import {
+  bootAndInstallBundles,
+  getBundleId,
+  makeBundleCacheContext,
+} from './boot-tools.js';
+import { startArbAssetName } from '../src/start-arbAssetName.js';
 
 /** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
 const test = anyTest;
@@ -19,31 +19,21 @@ test.before(async t => (t.context = await makeBundleCacheContext(t)));
 const nodeRequire = createRequire(import.meta.url);
 
 const contractName = 'arbAssetNames';
-const assets = {
+const bundleRoots = {
   [contractName]: nodeRequire.resolve('../src/arbAssetNames.js'),
 };
 
-const idOf = b => `b1-${b.endoZipBase64Sha512}`;
+test('Start arbitrary asset naming contract', async t => {
+  const { powers, bundles } = await bootAndInstallBundles(t, bundleRoots);
 
-test('Start the contract', async t => {
-  const { bundleCache } = t.context;
-
-  const money = makeIssuerKit('PlayMoney');
-  const issuers = { Price: money.issuer };
-  const terms = { Price: AmountMath.make(money.brand, 5n) };
-  t.log('terms:', terms);
-
-  const { powers, vatAdminState } = await makeBootstrapPowers(t.log);
-  const bundle = await bundleCache.load(assets[contractName], contractName);
-  const bundleID = idOf(bundle);
-  t.log('publish bundle', bundleID.slice(0, 8));
-  vatAdminState.installBundle(bundleID, bundle);
-
-  const zoe = powers.consume.zoe;
-
-  /** @type {ERef<Installation<ContractFn>>} */
-  const installation = E(zoe).install(bundle);
-  const { instance } = await E(zoe).startInstance(installation, issuers, terms);
+  await startArbAssetName(powers, {
+    assetNamingOptions: {
+      bundleID: getBundleId(bundles[contractName]),
+      price: 100n,
+      unit: 1_000_000n,
+    },
+  });
+  const instance = await powers.instance.consume.arbAssetName;
   t.log(instance);
   t.is(typeof instance, 'object');
 });
