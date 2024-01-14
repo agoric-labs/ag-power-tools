@@ -84,13 +84,18 @@ test('use contractStarter to start postalSvc', async t => {
     rose: await walletFactory.makeSmartWallet(shared.destAddr),
   };
   const toSend = { ToDoEmpty: AmountMath.make(brand.Invitation, harden([])) };
+  const sam = starterSam(t, { wallet: wallet.sam, ...id.postalSvc }, wellKnown);
   await Promise.all([
-    starterSam(t, { wallet: wallet.sam, ...id.postalSvc }, wellKnown).then(
-      ({ instance: postalSvc }) => {
-        const terms = { postalSvc, destAddr: shared.destAddr };
-        senderContract(t, { zoe, terms });
-      },
-    ),
+    E(sam)
+      .getPostalSvcTerms()
+      .then(customTerms =>
+        E(sam)
+          .installAndStart({ label: 'postalSvc', ...id.postalSvc, customTerms })
+          .then(({ instance: postalSvc }) => {
+            const terms = { postalSvc, destAddr: shared.destAddr };
+            senderContract(t, { zoe, terms });
+          }),
+      ),
     receiverRose(t, { wallet: wallet.rose }, wellKnown, { toSend }),
   ]);
 
