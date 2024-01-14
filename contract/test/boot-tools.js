@@ -7,7 +7,7 @@ import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
 import { makeFakeVatAdmin } from '@agoric/zoe/tools/fakeVatAdmin.js';
 import { makeZoeKitForTest } from '@agoric/zoe/tools/setup-zoe.js';
 import buildManualTimer from '@agoric/zoe/tools/manualTimer.js';
-import { makeFakeStorageKit } from '@agoric/internal/src/storage-test-utils.js';
+import { makeMockChainStorageRoot } from '@agoric/internal/src/storage-test-utils.js';
 
 export const getBundleId = b => `b1-${b.endoZipBase64Sha512}`;
 
@@ -35,9 +35,20 @@ export const makeBootstrapPowers = async (
   const chainTimerService = buildManualTimer();
   const timerBrand = await E(chainTimerService).getTimerBrand();
 
-  const { rootNode: chainStorage, data } = makeFakeStorageKit('published');
-
+  const chainStorage = makeMockChainStorageRoot();
   const board = makeFakeBoard();
+
+  const roMarshaller = await E(board).getReadonlyMarshaller();
+  // XXX HACK: mixes on-chain / offchain
+  const boardAux = async obj => {
+    const id = await E(board).getId(obj);
+    const auxData = chainStorage.getBody(
+      `mockChainStorageRoot.boardAux.${id}`,
+      roMarshaller,
+    );
+    return auxData;
+  };
+
   produce.zoe.resolve(zoe);
   produce.feeMintAccess.resolve(feeMintAccess);
   produce.agoricNamesAdmin.resolve(agoricNamesAdmin);
@@ -47,6 +58,7 @@ export const makeBootstrapPowers = async (
   produce.chainTimerService.resolve(chainTimerService);
   produce.chainStorage.resolve(chainStorage);
   produce.board.resolve(board);
+  produce.priceAuthority.resolve(undefined); // XXX
   spaces.brand.produce.timer.resolve(timerBrand);
   spaces.brand.produce.IST.resolve(feeBrand);
   spaces.brand.produce.Invitation.resolve(invitationBrand);
@@ -62,7 +74,7 @@ export const makeBootstrapPowers = async (
   // @ts-expect-error mock
   const powers = { produce, consume, ...spaces };
 
-  return { powers, vatAdminState, vstorageState: data };
+  return { powers, vatAdminState, boardAux };
 };
 
 export const makeBundleCacheContext = async (_t, dest = 'bundles/') => {
@@ -74,7 +86,8 @@ export const makeBundleCacheContext = async (_t, dest = 'bundles/') => {
 
 export const bootAndInstallBundles = async (t, bundleRoots) => {
   t.log('bootstrap');
-  const { powers, vatAdminState } = await makeBootstrapPowers(t.log);
+  const powersKit = await makeBootstrapPowers(t.log);
+  const { vatAdminState } = powersKit;
 
   const { bundleCache } = t.context;
   /** @type {Record<string, *>} */
@@ -86,5 +99,6 @@ export const bootAndInstallBundles = async (t, bundleRoots) => {
     vatAdminState.installBundle(bundleID, bundle);
     bundles[name] = bundle;
   }
-  return { powers, bundles };
+  harden(bundles);
+  return { ...powersKit, bundles };
 };
