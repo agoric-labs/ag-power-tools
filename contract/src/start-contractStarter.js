@@ -1,5 +1,8 @@
 // @ts-check
 import { E } from '@endo/far';
+import { allValues, mapValues } from './objectTools.js';
+import { boardAuxChild, makeBoardAuxNode, publish } from './boardAux.js';
+import { fixHub } from './fixHub.js';
 
 const { Fail } = assert;
 
@@ -43,13 +46,37 @@ export const installContractStarter = async (
   return installation;
 };
 
+/** @typedef {{ brand: string} & ({ value: bigint } | { value: number, digits?: number })} AmountData */
+
+const free = { brand: 'IST', value: 0n };
+/** @type {PriceConfig} */
+const defaultPrices = {
+  installBundleID: free,
+  startInstance: free,
+  storageNode: free,
+  timerService: free,
+};
+
 /**
  * @param {BootstrapPowers & ContractStarterPowers} powers
- * @param {{options?: { bundleID?: string }}} [_config]
+ * @param {{options?: { contractStarter?: {
+ *   bundleID?: string,
+ *   prices?: PriceConfig,
+ * }}}} [config]
+ *
+ * @typedef {Record<keyof import('../src/contractStarter.js').Prices, AmountData>} PriceConfig
  */
 export const startContractStarter = async (
   {
-    consume: { zoe },
+    consume: {
+      zoe,
+      chainStorage,
+      chainTimerService,
+      priceAuthority,
+      board,
+      agoricNames,
+      namesByAddressAdmin,
+    },
     produce: { contractStarterKit: contractStarterStartResult },
     installation: {
       consume: { contractStarter: consumeInstallation },
@@ -57,17 +84,62 @@ export const startContractStarter = async (
     instance: {
       produce: { contractStarter: produceInstance },
     },
+    brand: { consume: brandConsume },
   },
-  _config,
+  config,
 ) => {
   const installation = await consumeInstallation;
 
   const invitationIssuer = await E(zoe).getInvitationIssuer();
-  const startResult = await E(zoe).startInstance(installation, {
-    Invitation: invitationIssuer,
+  const feeIssuer = await E(zoe).getFeeIssuer();
+
+  const namesByAddress = await fixHub(namesByAddressAdmin);
+  const storage = (await chainStorage) || Fail`storage`; // XXX
+  const privateArgs = await allValues({
+    storageNode: makeBoardAuxNode(storage),
+    timerService: chainTimerService,
   });
+
+  /** @type {(a: AmountData) => bigint } */
+  const toValue = a =>
+    typeof a.value === 'bigint'
+      ? a.value
+      : BigInt(a.value * 1 ** (a.digits || 1));
+  /** @type {(a: AmountData) => Promise<Brand<'nat'>>} */
+  const toBrand = a => brandConsume[a.brand];
+  /** @param {AmountData} a } */
+  const toAmountP = a =>
+    allValues(harden({ brand: toBrand(a), value: toValue(a) }));
+  /** @type {import('../src/contractStarter.js').Prices} */
+  const prices = await allValues(
+    mapValues(
+      config?.options?.contractStarter?.prices || defaultPrices,
+      toAmountP,
+    ),
+  );
+  const terms = await allValues({
+    prices,
+    priceAuthority,
+    namesByAddress,
+    board,
+    agoricNames,
+  });
+
+  const startResult = await E(zoe).startInstance(
+    installation,
+    { Invitation: invitationIssuer, Fee: feeIssuer },
+    terms,
+    privateArgs,
+  );
   contractStarterStartResult.resolve(startResult);
+
   const { instance } = startResult;
+
+  const id = await E(board).getId(instance);
+  const startedTerms = await E(zoe).getTerms(instance);
+  const m = E(board).getPublishingMarshaller();
+  publish(boardAuxChild(storage, id), { terms: startedTerms }, m);
+
   produceInstance.reset();
   produceInstance.resolve(instance);
   return instance;

@@ -7,8 +7,6 @@
  * WARNING: anyone can start anything for free.
  *
  * Options:
- *   - charge a fee to start a contract
- *   - charge a fee to install a bundle
  *   - use a governed API (in the sense of @agoric/governance)
  *     for install, start
  *   - use a governed API for install
@@ -16,7 +14,6 @@
  *
  * Issues:
  *   - adminFacet is NOT SAVED. UPGRADE IS IMPOSSIBLE
- *   - smartWallet provides no effective way to provide privateArgs
  */
 // @ts-check
 
@@ -27,13 +24,61 @@ import {
   IssuerRecordShape,
 } from '@agoric/zoe/src/typeGuards.js';
 import { depositToSeat } from '@agoric/zoe/src/contractSupport/zoeHelpers.js';
+import { AmountShape } from '@agoric/ertp/src/typeGuards.js';
+import { AmountMath } from '@agoric/ertp/src/amountMath.js';
+import { atomicRearrange } from '@agoric/zoe/src/contractSupport/atomicTransfer.js';
+import { BOARD_AUX_PATH_SEGMENT, publish } from './boardAux.js';
 
 /** @template SF @typedef {import('@agoric/zoe/src/zoeService/utils').StartParams<SF>} StartParams<SF> */
 
+const { fromEntries, keys } = Object;
 const { Fail } = assert;
 
-// /** @type {ContractMeta} */
-// const meta = {};
+/** @type {import('./types').ContractMeta} */
+export const meta = harden({
+  customTermsShape: {
+    prices: {
+      startInstance: AmountShape,
+      installBundleID: AmountShape,
+      storageNode: AmountShape,
+      timerService: AmountShape,
+    },
+    board: M.remotable('board'),
+    namesByAddress: M.remotable('namesByAddress'),
+    agoricNames: M.remotable('agoricNames'),
+    priceAuthority: M.remotable('priceAuthority'),
+  },
+  privateArgsShape: {
+    storageNode: M.remotable('storageNode'),
+    timerService: M.remotable('timerService'),
+  },
+});
+export const customTermsShape = meta.customTermsShape;
+export const privateArgsShape = meta.privateArgsShape;
+/**
+ * @typedef {{
+ *   board: import('@agoric/vats').Board,
+ *   namesByAddress: NameHub,
+ *   agoricNames: NameHub,
+ *   priceAuthority: unknown,
+ * }} PublicServices
+ */
+
+/**
+ * @typedef {{
+ *   startInstance: Amount<'nat'>,
+ *   installBundleID: Amount<'nat'>,
+ *   storageNode: Amount<'nat'>,
+ *   timerService: Amount<'nat'>,
+ * }} Prices
+ */
+
+/**
+ * @typedef {{
+ *   storageNode: StorageNode,
+ *   timerService: unknown,
+ * }} LimitedAccess
+ */
 
 /**
  * @see {ZoeService.startInstance}
@@ -48,8 +93,13 @@ export const StartOptionsShape = M.and(
     customTerms: M.any(),
     privateArgs: M.any(),
     instanceLabel: M.string(),
+    permit: M.partial({
+      storageNode: BOARD_AUX_PATH_SEGMENT,
+      timerService: true,
+    }),
   }),
 );
+
 // TODO: generate types from shapes (IOU issue #)
 /**
  * @template SF
@@ -60,20 +110,32 @@ export const StartOptionsShape = M.and(
  *   customTerms: StartParams<SF>['terms'],
  *   privateArgs: StartParams<SF>['privateArgs'],
  *   instanceLabel: string,
+ *   permit: Record<keyof LimitedAccess, string | true>,
  * }>} StartOptions
  */
 
 const noHandler = () => Fail`no handler`;
 const NoProposalShape = M.not(M.any());
 
+const { add, makeEmpty } = AmountMath;
+/** @param {Amount<'nat'>[]} xs */
+const sum = xs =>
+  xs.reduce((subtot, x) => add(subtot, x), makeEmpty(xs[0].brand));
+
 /**
- * @param {ZCF} zcf
- * @param {unknown} _privateArgs
+ * @param {ZCF<PublicServices & { prices: Prices }>} zcf
+ * @param {LimitedAccess} limitedPowers
  * @param {unknown} _baggage
  */
-export const start = (zcf, _privateArgs, _baggage) => {
+export const start = (zcf, limitedPowers, _baggage) => {
+  const { prices, board } = zcf.getTerms();
+  const { storageNode } = limitedPowers;
+
   const zoe = zcf.getZoeService();
   const invitationIssuerP = E(zoe).getInvitationIssuer();
+  const { zcfSeat: fees } = zcf.makeEmptySeatKit();
+
+  const pubMarshaller = E(board).getPublishingMarshaller();
 
   // NOTE: opts could be moved to offerArgs to
   // save one layer of closure, but
@@ -93,24 +155,46 @@ export const start = (zcf, _privateArgs, _baggage) => {
   const makeStartInvitation = async opts => {
     mustMatch(opts, StartOptionsShape);
 
+    const Fee = sum([
+      prices.startInstance,
+      ...('installation' in opts ? [] : [prices.installBundleID]),
+      ...keys(opts.permit || {}).map(k => prices[k]),
+    ]);
+
     /** @param {ZCFSeat} seat */
     const handleStart = async seat => {
+      atomicRearrange(zcf, harden([[seat, fees, { Fee }]]));
       const installation = await ('installation' in opts
         ? opts.installation
         : E(zoe).installBundleID(opts.bundleID));
 
       const { issuerKeywordRecord, customTerms, privateArgs, instanceLabel } =
         opts;
+      const { storageNode: nodePermit, ...permit } = opts.permit || {};
+      const powers = fromEntries(
+        keys(permit || {}).map(k => [k, limitedPowers[k]]),
+      );
       /** @type {StartedInstanceKit<SF>} */
       const it = await E(zoe).startInstance(
         installation,
         issuerKeywordRecord,
         customTerms,
-        privateArgs,
+        { ...privateArgs, ...powers },
         instanceLabel,
       );
       // WARNING: adminFacet is dropped
       const { instance, creatorFacet } = it;
+
+      const itsTerms = await E(zoe).getTerms(instance);
+      const itsId = await E(board).getId(instance);
+      const itsNode = await E(storageNode).makeChildNode(itsId);
+      await publish(itsNode, { terms: itsTerms }, pubMarshaller);
+
+      if (nodePermit) {
+        const itsStorage = await E(itsNode).makeChildNode('info');
+        // @ts-expect-error nodePermit implies this method
+        await E(creatorFacet).initStorageNode(itsStorage);
+      }
 
       const handlesInDetails = zcf.makeInvitation(
         noHandler,
