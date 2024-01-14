@@ -1,7 +1,7 @@
 // @ts-check
 import { E, getInterfaceOf } from '@endo/far';
 import { AmountMath } from '@agoric/ertp/src/amountMath.js';
-import { allValues, mapValues } from './wallet-tools.js';
+import { allValues, mapValues, seatLike } from './wallet-tools.js';
 
 const { entries, fromEntries, keys } = Object;
 const { Fail } = assert;
@@ -16,15 +16,15 @@ const { Fail } = assert;
  */
 
 /**
- * @typedef {WellKnown & {
+ * @typedef {{
  *   assetKind: Map<Brand, AssetKind>
- * }} WellKnownK
+ * }} WellKnownKinds
  */
 
 /**
  * @param {import('ava').ExecutionContext} t
  * @param {{ wallet: import('./wallet-tools.js').MockWallet }} mine
- * @param { WellKnownK } wellKnown
+ * @param { WellKnown & WellKnownKinds } wellKnown
  * @param {{
  *   rxAddr: string,
  *   toSend: AmountKeywordRecord,
@@ -70,7 +70,7 @@ export const payerPete = async (
 /**
  * @param {import('ava').ExecutionContext} t
  * @param {{ wallet: import('./wallet-tools.js').MockWallet, }} mine
- * @param {WellKnownK} wellKnown
+ * @param {WellKnown & WellKnownKinds} wellKnown
  * @param {{ toSend: AmountKeywordRecord }} shared
  */
 export const receiverRose = async (t, { wallet }, wellKnown, { toSend }) => {
@@ -165,16 +165,22 @@ export const senderContract = async (
 };
 
 /**
+ * Auxiliary data
+ * @typedef {{
+ *   boardAux: (obj: unknown) => Promise<any>
+ * }} BoardAux
+ */
+
+/**
  * @param {import('ava').ExecutionContext} t
  * @param {{
  *   wallet: import('./wallet-tools.js').MockWallet,
  *   bundleID: string,
- *   namesByAddress: NameHub,
  * }} mine
- * @param { WellKnown } wellKnown
+ * @param { WellKnown & BoardAux} wellKnown
  */
 export const starterSam = async (t, mine, wellKnown) => {
-  const { wallet, bundleID, namesByAddress } = mine;
+  const { wallet, bundleID } = mine;
   const brand = {
     Invitation: await wellKnown.brand.Invitation,
   };
@@ -182,8 +188,12 @@ export const starterSam = async (t, mine, wellKnown) => {
     contractStarter: await wellKnown.instance.contractStarter,
   };
 
-  t.log('Sam starts postalSvc from bundle', bundleID.slice(0, 8));
+  const {
+    terms: { namesByAddress },
+  } = await wellKnown.boardAux(instance.contractStarter);
+  t.log('Sam got namesByAddress from contractStarter terms', namesByAddress);
   const customTerms = { namesByAddress };
+  t.log('Sam starts postalSvc from bundle', bundleID.slice(0, 8));
   const updates = await E(wallet.offers).executeOffer({
     id: 'samStart-1',
     invitationSpec: {
@@ -195,9 +205,7 @@ export const starterSam = async (t, mine, wellKnown) => {
   });
 
   const expected = {
-    result: {
-      invitationMakers: true,
-    },
+    result: 'UNPUBLISHED',
     payouts: {
       Started: {
         brand: brand.Invitation,
@@ -228,33 +236,24 @@ export const starterSam = async (t, mine, wellKnown) => {
     return it;
   };
 
-  const todo = new Map(entries(expected));
-  let done;
-  for await (const update of updates) {
-    // t.log('Sam offer update', update);
-    if (update.updated !== 'offerStatus') continue;
-    const { result, payouts } = update.status;
-    if (result && todo.has('result')) {
-      checkKeys('Sam gets creatorFacet', result, expected.result);
-      todo.delete('result');
-    }
-    if (payouts) {
-      checkKeys(undefined, payouts, expected.payouts);
-      const { Started } = payouts;
-      t.is(Started.brand, expected.payouts.Started.brand);
-      const details = first(Started.value);
-      const [details0] = expected.payouts.Started.value;
-      checkKeys(undefined, details, details0);
-      t.is(details.instance, details0.instance);
-      checkKeys(
-        'Sam gets instance etc.',
-        details.customDetails,
-        details0.customDetails,
-      );
-      done = details.customDetails;
-      todo.delete('payouts');
-    }
-  }
-  t.deepEqual([...todo.keys()], []);
-  return done;
+  const seat = seatLike(updates);
+
+  const result = await E(seat).getOfferResult();
+  checkKeys('Sam gets creatorFacet', result, expected.result);
+
+  const payouts = await E(seat).getPayouts();
+  checkKeys(undefined, payouts, expected.payouts);
+  const { Started } = payouts;
+  t.is(Started.brand, expected.payouts.Started.brand);
+  const details = first(Started.value);
+  const [details0] = expected.payouts.Started.value;
+  checkKeys(undefined, details, details0);
+  t.is(details.instance, details0.instance);
+  checkKeys(
+    'Sam gets instance etc.',
+    details.customDetails,
+    details0.customDetails,
+  );
+
+  return details.customDetails;
 };

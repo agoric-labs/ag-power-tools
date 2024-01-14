@@ -58,7 +58,7 @@ export const makeBootstrapPowers = async (
   produce.chainTimerService.resolve(chainTimerService);
   produce.chainStorage.resolve(chainStorage);
   produce.board.resolve(board);
-  produce.priceAuthority.resolve(undefined); // XXX
+  produce.priceAuthority.resolve(board); // XXX
   spaces.brand.produce.timer.resolve(timerBrand);
   spaces.brand.produce.IST.resolve(feeBrand);
   spaces.brand.produce.Invitation.resolve(invitationBrand);
