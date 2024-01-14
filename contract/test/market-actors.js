@@ -175,34 +175,28 @@ export const senderContract = async (
  * @param {import('ava').ExecutionContext} t
  * @param {{
  *   wallet: import('./wallet-tools.js').MockWallet,
- *   bundleID: string,
  * }} mine
  * @param { WellKnown & BoardAux} wellKnown
  */
 export const starterSam = async (t, mine, wellKnown) => {
-  const { wallet, bundleID } = mine;
+  const { wallet } = mine;
+
+  const checkKeys = (label, actual, expected) => {
+    label && t.log(label, actual);
+    t.deepEqual(keys(actual), keys(expected));
+  };
+  const first = array => {
+    t.true(Array.isArray(array));
+    t.is(array.length, 1);
+    const [it] = array;
+    return it;
+  };
   const brand = {
     Invitation: await wellKnown.brand.Invitation,
   };
   const instance = {
     contractStarter: await wellKnown.instance.contractStarter,
   };
-
-  const {
-    terms: { namesByAddress },
-  } = await wellKnown.boardAux(instance.contractStarter);
-  t.log('Sam got namesByAddress from contractStarter terms', namesByAddress);
-  const customTerms = { namesByAddress };
-  t.log('Sam starts postalSvc from bundle', bundleID.slice(0, 8));
-  const updates = await E(wallet.offers).executeOffer({
-    id: 'samStart-1',
-    invitationSpec: {
-      source: 'contract',
-      instance: instance.contractStarter,
-      publicInvitationMaker: 'makeStartInvitation',
-      invitationArgs: [{ bundleID, customTerms }],
-    },
-  });
 
   const expected = {
     result: {
@@ -227,35 +221,55 @@ export const starterSam = async (t, mine, wellKnown) => {
     },
   };
 
-  const checkKeys = (label, actual, expected) => {
-    label && t.log(label, actual);
-    t.deepEqual(keys(actual), keys(expected));
-  };
-  const first = array => {
-    t.true(Array.isArray(array));
-    t.is(array.length, 1);
-    const [it] = array;
-    return it;
+  const getPostalSvcTerms = async () => {
+    const {
+      terms: { namesByAddress },
+    } = await wellKnown.boardAux(instance.contractStarter);
+    t.log('Sam got namesByAddress from contractStarter terms', namesByAddress);
+    return { namesByAddress };
   };
 
-  const seat = seatLike(updates);
+  /**
+   * @template CT
+   * @param {{
+   *   bundleID?: string,
+   *   customTerms?: CT,
+   *   label?: string,
+   * }} opts
+   */
+  const installAndStart = async opts => {
+    t.log('Sam starts', opts.label, 'from', (opts.bundleID || '').slice(0, 8));
+    const updates = await E(wallet.offers).executeOffer({
+      id: 'samStart-1',
+      invitationSpec: {
+        source: 'contract',
+        instance: instance.contractStarter,
+        publicInvitationMaker: 'makeStartInvitation',
+        invitationArgs: [opts],
+      },
+    });
 
-  const result = await E(seat).getOfferResult();
-  checkKeys('Sam gets creatorFacet', result, expected.result);
+    const seat = seatLike(updates);
 
-  const payouts = await E(seat).getPayouts();
-  checkKeys(undefined, payouts, expected.payouts);
-  const { Started } = payouts;
-  t.is(Started.brand, expected.payouts.Started.brand);
-  const details = first(Started.value);
-  const [details0] = expected.payouts.Started.value;
-  checkKeys(undefined, details, details0);
-  t.is(details.instance, details0.instance);
-  checkKeys(
-    'Sam gets instance etc.',
-    details.customDetails,
-    details0.customDetails,
-  );
+    const result = await E(seat).getOfferResult();
+    checkKeys('Sam gets creatorFacet', result, expected.result);
 
-  return details.customDetails;
+    const payouts = await E(seat).getPayouts();
+    checkKeys(undefined, payouts, expected.payouts);
+    const { Started } = payouts;
+    t.is(Started.brand, expected.payouts.Started.brand);
+    const details = first(Started.value);
+    const [details0] = expected.payouts.Started.value;
+    checkKeys(undefined, details, details0);
+    t.is(details.instance, details0.instance);
+    checkKeys(
+      'Sam gets instance etc.',
+      details.customDetails,
+      details0.customDetails,
+    );
+
+    return details.customDetails;
+  };
+
+  return { getPostalSvcTerms, installAndStart };
 };
