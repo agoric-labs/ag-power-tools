@@ -1,5 +1,6 @@
 // @ts-check
 import { E, Far } from '@endo/far';
+import { makePromiseKit } from '@endo/promise-kit';
 import { allValues, mapValues } from '../src/objectTools.js';
 export { allValues, mapValues };
 
@@ -153,4 +154,27 @@ export const mockWalletFactory = (
   };
 
   return harden({ makeSmartWallet });
+};
+
+/**
+ * Seat-like API from updates
+ * @param {*} updates
+ */
+export const seatLike = updates => {
+  const sync = {
+    result: makePromiseKit(),
+    payouts: makePromiseKit(),
+  };
+  (async () => {
+    for await (const update of updates) {
+      if (update.updated !== 'offerStatus') continue;
+      const { result, payouts } = update.status;
+      if (result) sync.result.resolve(result);
+      if (payouts) sync.payouts.resolve(payouts);
+    }
+  })();
+  return harden({
+    getOfferResult: () => sync.result.promise,
+    getPayouts: () => sync.payouts.promise,
+  });
 };
