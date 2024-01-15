@@ -115,6 +115,7 @@ export const mockWalletFactory = (
           return E(purse).withdraw(amt);
         }),
       );
+      // XXX throwing here is unhandled somehow.
       const seat = await E(zoe).offer(invitation, proposal, pmts, offerArgs);
       //   console.log(address, offerSpec.id, 'got seat');
       yield { updated: 'offerStatus', status: offerSpec };
@@ -166,11 +167,18 @@ export const seatLike = updates => {
     payouts: makePromiseKit(),
   };
   (async () => {
-    for await (const update of updates) {
-      if (update.updated !== 'offerStatus') continue;
-      const { result, payouts } = update.status;
-      if (result) sync.result.resolve(result);
-      if (payouts) sync.payouts.resolve(payouts);
+    try {
+      // XXX an error here is somehow and unhandled rejection
+      for await (const update of updates) {
+        if (update.updated !== 'offerStatus') continue;
+        const { result, payouts } = update.status;
+        if ('result' in update.status) sync.result.resolve(result);
+        if ('payouts' in update.status) sync.payouts.resolve(payouts);
+      }
+    } catch (reason) {
+      sync.result.reject(reason);
+      sync.payouts.reject(reason);
+      throw reason;
     }
   })();
   return harden({
