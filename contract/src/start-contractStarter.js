@@ -144,3 +144,19 @@ export const startContractStarter = async (
   produceInstance.resolve(instance);
   return instance;
 };
+
+export const permit = {
+  consume: {
+    zoe: true,
+    chainStorage: true,
+    chainTimerService: true,
+    priceAuthority: true,
+    board: true,
+    agoricNames: true,
+    namesByAddressAdmin: true,
+  },
+  produce: { contractStarterKit: true },
+  installation: { consume: { contractStarter: true } },
+  instance: { produce: { contractStarter: true } },
+  brand: { consume: { IST: true } },
+};
