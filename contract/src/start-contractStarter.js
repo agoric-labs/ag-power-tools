@@ -34,7 +34,7 @@ export const installContractStarter = async (
 ) => {
   const {
     // rendering this template requires not re-flowing the next line
-    bundleID = Fail`bundleID required`,
+    bundleID = Fail`contractStarter bundleID required`,
   } = options?.contractStarter || {};
 
   const installation = await E(zoe).installBundleID(bundleID);
@@ -71,4 +71,28 @@ export const startContractStarter = async (
   produceInstance.reset();
   produceInstance.resolve(instance);
   return instance;
+};
+
+export const permit = {
+  consume: {
+    zoe: true,
+    chainStorage: true,
+    chainTimerService: true,
+    priceAuthority: true,
+    board: true,
+    agoricNames: true,
+    namesByAddressAdmin: true,
+  },
+  produce: { contractStarterKit: true },
+  installation: {
+    produce: { contractStarter: true },
+    consume: { contractStarter: true },
+  },
+  instance: { produce: { contractStarter: true } },
+  brand: { consume: { IST: true } },
+};
+
+export const main = async powers => {
+  await installContractStarter(powers);
+  await startContractStarter(powers);
 };
