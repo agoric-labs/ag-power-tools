@@ -15,7 +15,7 @@ const hideImportExpr = txt => txt.replace(/\bimport\b/g, 'XMPORT');
 
 export const moduleToScript = () => ({
   name: 'module-to-script',
-  generateBundle: (opts, bundle, isWrite) => {
+  generateBundle: (_opts, bundle, _isWrite) => {
     for (const fileName of Object.keys(bundle)) {
       bundle[fileName].code = hideImportExpr(
         redactImportDecls(omitExportKewords(bundle[fileName].code)),
@@ -40,3 +40,15 @@ export const configureBundleID = ({ name, rootModule, cache }) => {
     },
   };
 };
+
+export const emitPermit = ({ permit, file }) => ({
+  name: 'emit-permit',
+  generateBundle(_opts, _bundle) {
+    console.log('@@@emit permit');
+    this.emitFile({
+      type: 'asset',
+      fileName: file,
+      source: JSON.stringify(permit, null, 2),
+    });
+  },
+});
