@@ -12,6 +12,7 @@
     "make:help": "make list",
     "start": "yarn docker:make clean start-contract print-key",
     "build": "exit 0",
+    "build:deployer": "rollup -c rollup.config.mjs src/start-contractStarter.js",
     "test": "ava --verbose",
     "lint": "eslint '**/*.{js,jsx}'",
     "lint-fix": "eslint --fix '**/*.{js,jsx}'",

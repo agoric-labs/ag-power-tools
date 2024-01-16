@@ -37,7 +37,7 @@ export const installContractStarter = async (
 ) => {
   const {
     // rendering this template requires not re-flowing the next line
-    bundleID = Fail`bundleID required`,
+    bundleID = Fail`contractStarter bundleID required`,
   } = options?.contractStarter || {};
 
   const installation = await E(zoe).installBundleID(bundleID);
