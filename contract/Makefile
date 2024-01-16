@@ -21,6 +21,29 @@ SIGN_BROADCAST_OPTS=--keyring-backend=test --chain-id=$(CHAINID) \
 		--gas=auto --gas-adjustment=$(GAS_ADJUSTMENT) \
 		--yes -b block
 
+mint100:
+	make FUNDS=1000$(ATOM) fund-acct
+	cd /usr/src/agoric-sdk && \
+		yarn --silent agops vaults open --wantMinted 100 --giveCollateral 100 >/tmp/want-ist.json && \
+		yarn --silent agops perf satisfaction --executeOffer /tmp/want-ist.json --from user1 --keyring-backend=test
+
+# https://agoric.explorers.guru/proposal/61
+lower-bundle-cost: bundles/lower-bundle-cost.json ./scripts/voteLatestProposalAndWait.sh
+	agd tx gov submit-proposal param-change bundles/lower-bundle-cost.json \
+	$(SIGN_BROADCAST_OPTS) \
+	--from user1
+	./scripts/voteLatestProposalAndWait.sh
+	# agd query swingset params
+
+
+bundles/swingset-params.json:
+	mkdir -p bundles/
+	agd query swingset params -o json >$@
+
+bundles/lower-bundle-cost.json: bundles/swingset-params.json scripts/write-param-change.js
+	@(read PARAMS < bundles/swingset-params.json; export PARAMS; \
+	node scripts/write-param-change.js) >$@
+
 mint4k:
 	make FUNDS=1000$(ATOM) fund-acct
 	cd /usr/src/agoric-sdk && \
