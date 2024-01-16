@@ -160,3 +160,8 @@ export const permit = {
   instance: { produce: { contractStarter: true } },
   brand: { consume: { IST: true } },
 };
+
+export const main = async powers => {
+  await installContractStarter(powers);
+  await startContractStarter(powers);
+};
