@@ -17,3 +17,6 @@ export const mapValues = (obj, f) =>
       return entry;
     }),
   );
+
+/** @type {<X, Y>(xs: X[], ys: Y[]) => [X, Y][]} */
+export const zip = (xs, ys) => xs.map((x, i) => [x, ys[i]]);
