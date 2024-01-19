@@ -58,8 +58,18 @@ const format = async (specimen, provideName) => {
 test.todo('client can refer to $ag.brand.IST without vstorage query');
 test.todo('walletFactory marshals IST using $ag.brand.IST? or boardID?');
 test.todo('client can add an issuer by setting issuer.my.BRD');
+test.todo('client can add issuers by referring to them in a new offer field');
+test.todo('client can add issuers using a new smartWallet method');
 test.todo('send to namesByAddress.agoric1323432.depositFacet');
 test.todo('send to contact.fred.depositFacet');
 test.todo('subsume offer result lookup: $offer.bid34.result');
 test.todo('send invitation received as offer result to contact.fred');
 test.todo('smartWallet does _not_ publish offer result');
+test.todo('lookup can get brand from issuer with .getBrand()');
+test.todo('lookup from an instance: .getTerms(), ["issuers"], ["BRD"]');
+test.todo('.receive() with new brand creates purse if path to issuer exists');
+test.todo('how to process queued payments if issuer is added later?');
+test.todo(
+  `CRAZY? use interface name
+  to distinguish brands from issuers when starting lookup`,
+);
