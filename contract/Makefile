@@ -95,6 +95,21 @@ build-proposal: bundles/bundle-list
 bundles/bundle-list start-game1.js start-game1-permit.json:
 	./scripts/build-proposal.sh
 
+install-launchIt: bundles/bundle-launchIt.json.deployed
+
+bundles/bundle-launchIt.json: src/launchIt.js
+	yarn --silent bundle-source --cache-json bundles/ src/launchIt.js launchIt
+
+%.json.deployed: %.json
+	ls -sh $<
+	agd tx swingset install-bundle --compress "@$<" \
+		-o json \
+		--from $(ACCT_ADDR) \
+		$(SIGN_BROADCAST_OPTS) >$@ || rm $@
+	@echo TODO: try agoric publish to better track outcome
+	jq '{bundleID: ("b1-" + .endoZipBase64Sha512)}' $<
+	jq '{code: .code, height: .height}' $@
+
 
 clean:
 	@rm -rf start-game1.js start-game1-permit.json bundles/
