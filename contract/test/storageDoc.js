@@ -4,7 +4,8 @@ import { eventLoopIteration } from '@agoric/internal/src/testing-utils.js';
  * @param {import('ava').ExecutionContext<unknown>} t
  * @param {import('@agoric/internal/src/storage-test-utils.js').MockChainStorageRoot} storage
  * @param {({ note: string } | { node: string, owner: string }) &
- *  ({ pattern: string, replacement: string } | {})
+ *  ({ pattern: string, replacement: string } | {}) &
+ *  ({ marshaller?: Marshaller })
  * } opts
  */
 export const documentStorageSchema = async (t, storage, opts) => {
@@ -17,7 +18,10 @@ export const documentStorageSchema = async (t, storage, opts) => {
       : { pattern: 'mockChainStorageRoot.', replacement: 'published.' };
   const illustration = [...storage.keys()].sort().map(
     /** @type {(k: string) => [string, unknown]} */
-    key => [key.replace(pattern, replacement), storage.getBody(key)],
+    key => [
+      key.replace(pattern, replacement),
+      storage.getBody(key, opts.marshaller),
+    ],
   );
   const pruned = illustration.filter(
     'node' in opts
