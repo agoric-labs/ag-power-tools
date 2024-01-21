@@ -15,7 +15,8 @@ export const makeAgd = ({ execFileSync }) => {
       ...(home ? ['--home', home] : []),
       ...(keyringBackend ? [`--keyring-backend`, keyringBackend] : []),
     ];
-    console.warn('XXX: rpcAddrs after [0] are ignored');
+    (rpcAddrs || []).length > 1 &&
+      console.warn('XXX: rpcAddrs after [0] are ignored');
     const nodeArgs = [...(rpcAddrs ? [`--node`, rpcAddrs[0]] : [])];
 
     // TODO: verbose option
