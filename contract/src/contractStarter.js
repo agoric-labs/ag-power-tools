@@ -81,6 +81,18 @@ export const privateArgsShape = meta.privateArgsShape;
  * }} LimitedAccess
  */
 
+export const InstallOptsShape = M.splitRecord(
+  { bundleID: M.string() },
+  { label: M.string() },
+);
+
+/**
+ * @typedef {{
+ *   bundleID: string,
+ *   label?: string  // XXX call it bundleLabel?
+ * }} InstallOpts
+ */
+
 /**
  * @see {ZoeService.startInstance}
  */
@@ -110,7 +122,7 @@ export const StartOptionsShape = M.and(
  *   issuerKeywordRecord: Record<string, Issuer>,
  *   customTerms: StartParams<SF>['terms'],
  *   privateArgs: StartParams<SF>['privateArgs'],
- *   instanceLabel: string,
+ *   instanceLabel: string, // XXX add bundleLabel?
  *   permit: Record<keyof LimitedAccess, string | true>,
  * }>} StartOptions
  */
@@ -139,6 +151,60 @@ export const start = (zcf, limitedPowers, _baggage) => {
 
   const pubMarshaller = E(board).getPublishingMarshaller();
 
+  const InstallProposalShape = M.splitRecord({
+    give: { Fee: M.gte(prices.installBundleID) },
+    // TODO: want: { Started: StartedAmountPattern }
+  });
+
+  /**
+   * @param {ZCFSeat} seat
+   * @param {string} description
+   * @param {{ installation: unknown, instance?: unknown }} handles
+   */
+  const depositHandles = async (seat, description, handles) => {
+    const handlesInDetails = zcf.makeInvitation(
+      noHandler,
+      description,
+      handles,
+      NoProposalShape,
+    );
+    const amt = await E(invitationIssuerP).getAmountOf(handlesInDetails);
+    await depositToSeat(
+      zcf,
+      seat,
+      { Handles: amt },
+      { Handles: handlesInDetails },
+    );
+  };
+
+  /**
+   * @param {ZCFSeat} seat
+   * @param {InstallOpts} opts
+   */
+  const installHandler = async (seat, opts) => {
+    mustMatch(opts, InstallOptsShape);
+
+    atomicRearrange(
+      zcf,
+      harden([[seat, fees, { Fee: prices.installBundleID }]]),
+    );
+
+    const { bundleID, label } = opts;
+    const installation = await E(zoe).installBundleID(bundleID, label);
+
+    await depositHandles(seat, 'installed', { installation });
+    seat.exit();
+    return harden(`${opts.label} installed`);
+  };
+
+  const makeInstallInvitation = () =>
+    zcf.makeInvitation(
+      installHandler,
+      'install',
+      undefined,
+      InstallProposalShape,
+    );
+
   // NOTE: opts could be moved to offerArgs to
   // save one layer of closure, but
   // this way makes the types more discoverable via publicFacet
@@ -163,12 +229,17 @@ export const start = (zcf, limitedPowers, _baggage) => {
       ...keys(opts.permit || {}).map(k => prices[k]),
     ]);
 
+    const StartProposalShape = M.splitRecord({
+      give: { Fee: M.gte(Fee) },
+      // TODO: want: { Started: StartedAmountPattern }
+    });
+
     /** @param {ZCFSeat} seat */
     const handleStart = async seat => {
       atomicRearrange(zcf, harden([[seat, fees, { Fee }]]));
       const installation = await ('installation' in opts
         ? opts.installation
-        : E(zoe).installBundleID(opts.bundleID));
+        : E(zoe).installBundleID(opts.bundleID, opts.instanceLabel));
 
       const { issuerKeywordRecord, customTerms, privateArgs, instanceLabel } =
         opts;
@@ -184,7 +255,7 @@ export const start = (zcf, limitedPowers, _baggage) => {
         { ...privateArgs, ...powers },
         instanceLabel,
       );
-      // WARNING: adminFacet is dropped
+      // TODO: WARNING: adminFacet is dropped
       const { instance, creatorFacet } = it;
 
       const itsTerms = await E(zoe).getTerms(instance);
@@ -202,26 +273,21 @@ export const start = (zcf, limitedPowers, _baggage) => {
         await E(creatorFacet).initStorageNode(itsStorage);
       }
 
-      const handlesInDetails = zcf.makeInvitation(
-        noHandler,
-        'started',
-        { instance, installation },
-        NoProposalShape,
-      );
-      const amt = await E(invitationIssuerP).getAmountOf(handlesInDetails);
-      await depositToSeat(
-        zcf,
-        seat,
-        { Started: amt },
-        { Started: handlesInDetails },
-      );
+      await depositHandles(seat, 'started', { instance, installation });
       seat.exit();
       return harden({ invitationMakers: creatorFacet });
     };
-    return zcf.makeInvitation(handleStart, 'start');
+
+    return zcf.makeInvitation(
+      handleStart,
+      'start',
+      undefined,
+      StartProposalShape,
+    );
   };
 
   const publicFacet = Far('PublicFacet', {
+    makeInstallInvitation,
     makeStartInvitation,
   });
 
