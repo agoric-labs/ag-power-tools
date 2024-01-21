@@ -3,19 +3,20 @@ import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
 import { createRequire } from 'module';
 
 import { E } from '@endo/far';
-import {
-  makeBundleCacheContext,
-  bootAndInstallBundles,
-  getBundleId,
-} from './boot-tools.js';
 import { makeWalletFactory } from './wallet-tools.js';
 import { AmountMath, AssetKind } from '@agoric/ertp/src/amountMath.js';
 import { makeIssuerKit } from '@agoric/ertp';
 import { makeFan, launcherLarry, starterSam } from './market-actors.js';
 import {
+  makeBundleCacheContext,
+  bootAndInstallBundles,
+  getBundleId,
+} from './boot-tools.js';
+import {
   installContractStarter,
   startContractStarter,
 } from '../src/start-contractStarter.js';
+import { makeStableFaucet } from './mintStable.js';
 
 const nodeRequire = createRequire(import.meta.url);
 
@@ -76,10 +77,20 @@ test.serial('start launchIt instance to launch token', async t => {
     boardAux,
   };
 
+  const { feeMintAccess, zoe } = powers.consume;
+  const { bundleCache } = t.context;
+  const { mintBrandedPayment } = makeStableFaucet({
+    bundleCache,
+    feeMintAccess,
+    zoe,
+  });
   const wallet = {
     sam: await walletFactory.makeSmartWallet('agoric1sam'),
     larry: await walletFactory.makeSmartWallet('agoric1larry'),
   };
+  await E(wallet.sam.deposit).receive(
+    await mintBrandedPayment(100n * 1_000_000n),
+  );
   const sam = starterSam(t, { wallet: wallet.sam }, wellKnown);
 
   const installation = await E(sam).install({ bundleID, label: 'launchIt' });
@@ -92,6 +103,9 @@ test.serial('start launchIt instance to launch token', async t => {
   powers.issuer.produce.MNY.resolve(MNY.issuer);
   await E(wallet.larry.offers).addIssuer(MNY.issuer);
   assert(await wellKnown.brand.timer, 'no timer brand???');
+  await E(wallet.larry.deposit).receive(
+    await mintBrandedPayment(20n * 1_000_000n),
+  );
   const larry = await launcherLarry(t, { wallet: wallet.larry }, wellKnown);
   const instance = await E(larry).launch(installation);
 

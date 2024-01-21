@@ -225,8 +225,9 @@ export const starterSam = async (t, mine, wellKnown) => {
   /** @param {{ bundleID: string, label?: string}} opts */
   const install = async opts => {
     const starterAux = await wellKnown.boardAux(instance.contractStarter);
-    const { installBundleID } = starterAux.terms.prices;
-    t.log('sam gives', installBundleID, 'to install', opts.label);
+    const { prices } = starterAux.terms;
+    const { installBundleID: Fee } = prices;
+    t.log('sam gives', Fee, 'to install', opts.label);
     const updates = await E(wallet.offers).executeOffer({
       id: `install-${(offerSeq += 1)}`,
       invitationSpec: {
@@ -234,7 +235,7 @@ export const starterSam = async (t, mine, wellKnown) => {
         instance: instance.contractStarter,
         publicInvitationMaker: 'makeInstallInvitation',
       },
-      proposal: { give: { Fee: installBundleID } },
+      proposal: { give: { Fee } },
       offerArgs: opts,
     });
     const payouts = await E(seatLike(updates)).getPayouts();
@@ -269,7 +270,11 @@ export const starterSam = async (t, mine, wellKnown) => {
       (opts.bundleID || '').slice(0, 8),
     );
     const starterAux = await wellKnown.boardAux(instance.contractStarter);
-    const { startInstance } = starterAux.terms.prices;
+    const { prices } = starterAux.terms;
+    const { add } = AmountMath;
+    const Fee = add(prices.installBundleID, prices.startInstance);
+    t.log('sam gives', Fee, 'to start', opts.instanceLabel);
+
     const updates = await E(wallet.offers).executeOffer({
       id: `samStart-${(offerSeq += 1)}`,
       invitationSpec: {
@@ -278,7 +283,7 @@ export const starterSam = async (t, mine, wellKnown) => {
         publicInvitationMaker: 'makeStartInvitation',
         invitationArgs: [opts],
       },
-      proposal: { give: { Fee: startInstance } },
+      proposal: { give: { Fee } },
     });
 
     const seat = seatLike(updates);

@@ -16,6 +16,7 @@ import { mockWalletFactory } from './wallet-tools.js';
 import { receiverRose, senderContract, starterSam } from './market-actors.js';
 import { documentStorageSchema } from './storageDoc.js';
 import { makeClientMarshaller } from '../src/marshalTables.js';
+import { makeStableFaucet } from './mintStable.js';
 
 /** @typedef {import('../src/start-contractStarter.js').ContractStarterPowers} ContractStarterPowers */
 
@@ -70,7 +71,8 @@ test('use contractStarter to start postalSvc', async t => {
     boardAux,
   };
 
-  const { zoe, namesByAddressAdmin, chainStorage } = powers.consume;
+  const { zoe, namesByAddressAdmin, chainStorage, feeMintAccess } =
+    powers.consume;
   const walletFactory = mockWalletFactory(
     { zoe, namesByAddressAdmin, chainStorage },
     {
@@ -84,6 +86,16 @@ test('use contractStarter to start postalSvc', async t => {
     sam: await walletFactory.makeSmartWallet('agoric1senderSamStart'),
     rose: await walletFactory.makeSmartWallet(shared.destAddr),
   };
+  const { bundleCache } = t.context;
+  const { mintBrandedPayment } = makeStableFaucet({
+    bundleCache,
+    feeMintAccess,
+    zoe,
+  });
+
+  await E(wallet.sam.deposit).receive(
+    await mintBrandedPayment(100n * 1_000_000n),
+  );
   const toSend = { ToDoEmpty: AmountMath.make(brand.Invitation, harden([])) };
   const sam = starterSam(t, { wallet: wallet.sam, ...id.postalSvc }, wellKnown);
   await Promise.all([
