@@ -95,7 +95,7 @@ const main = async (args, env, io = {}) => {
     return offerSpec;
   };
 
-  const offer = await makeReserveAddOffer();
+  const offer = await makeStartOffer();
 
   if (args.includes('--generate-only')) {
     const action = wallet.offers.formatAction(offer);
@@ -113,6 +113,7 @@ const main = async (args, env, io = {}) => {
   console.log({ ...txInfo, result });
   const payouts = await seat.getPayouts();
   console.log({ ...txInfo, payouts, result });
+  console.log(payouts?.Handles?.value[0]?.customDetails);
 };
 
 await main(process.argv, process.env).catch(err => console.error(err));
