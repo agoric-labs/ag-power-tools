@@ -15,6 +15,7 @@ import {
 import { mockWalletFactory } from './wallet-tools.js';
 import { receiverRose, senderContract, starterSam } from './market-actors.js';
 import { documentStorageSchema } from './storageDoc.js';
+import { makeClientMarshaller } from '../src/marshalTables.js';
 
 /** @typedef {import('../src/start-contractStarter.js').ContractStarterPowers} ContractStarterPowers */
 
@@ -99,7 +100,8 @@ test('use contractStarter to start postalSvc', async t => {
     receiverRose(t, { wallet: wallet.rose }, wellKnown, { toSend }),
   ]);
 
+  const m = makeClientMarshaller();
   const storage = await powers.consume.chainStorage;
   const note = `Terms of contractStarter and the contracts it starts are published under boardAux`;
-  await documentStorageSchema(t, storage, { note });
+  await documentStorageSchema(t, storage, { note, marshaller: m });
 });
