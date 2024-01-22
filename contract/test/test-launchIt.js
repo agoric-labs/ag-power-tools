@@ -1,5 +1,5 @@
 // @ts-check
-import { test } from './prepare-test-env-ava.js';
+import { test as anyTest } from './prepare-test-env-ava.js';
 import { createRequire } from 'module';
 
 import { E } from '@endo/far';
@@ -27,6 +27,9 @@ const bundleRoots = {
   [contractName]: nodeRequire.resolve('../src/launchIt.js'),
   contractStarter: nodeRequire.resolve('../src/contractStarter.js'),
 };
+
+/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
+const test = anyTest;
 
 test.before(async t => (t.context = await makeBundleCacheContext(t)));
 

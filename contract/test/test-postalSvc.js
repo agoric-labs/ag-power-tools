@@ -1,7 +1,7 @@
 // @ts-check
 // XXX what's the state-of-the-art in ava setup?
 // eslint-disable-next-line import/order
-import { test } from './prepare-test-env-ava.js';
+import { test as anyTest } from './prepare-test-env-ava.js';
 
 import { createRequire } from 'module';
 
@@ -29,6 +29,9 @@ const nodeRequire = createRequire(import.meta.url);
 const bundleRoots = {
   postalSvc: nodeRequire.resolve('../src/postalSvc.js'),
 };
+
+/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
+const test = anyTest;
 
 test.before(async t => (t.context = await makeBundleCacheContext(t)));
 
