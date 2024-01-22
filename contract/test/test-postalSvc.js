@@ -1,7 +1,7 @@
 // @ts-check
 // XXX what's the state-of-the-art in ava setup?
 // eslint-disable-next-line import/order
-import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
+import { test as anyTest } from './prepare-test-env-ava.js';
 
 import { createRequire } from 'module';
 
