@@ -1,5 +1,5 @@
 // @ts-check
-import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
+import { test } from './prepare-test-env-ava.js';
 import { E } from '@endo/far';
 import { AmountMath, AssetKind } from '@agoric/ertp';
 import { createRequire } from 'module';
@@ -26,9 +26,6 @@ const assets = {
   contractStarter: myRequire.resolve('../src/contractStarter.js'),
   postalSvc: myRequire.resolve('../src/postalSvc.js'),
 };
-
-/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
-const test = anyTest;
 
 test.before(async t => (t.context = await makeBundleCacheContext(t)));
 

@@ -1,7 +1,7 @@
 // @ts-check
 // XXX what's the state-of-the-art in ava setup?
 // eslint-disable-next-line import/order
-import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
+import { test } from './prepare-test-env-ava.js';
 
 import { createRequire } from 'module';
 
@@ -23,9 +23,6 @@ import {
 } from './market-actors.js';
 
 const { entries, fromEntries, keys } = Object;
-
-/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
-const test = anyTest;
 
 const nodeRequire = createRequire(import.meta.url);
 
