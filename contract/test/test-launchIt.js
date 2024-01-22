@@ -17,6 +17,8 @@ import {
   startContractStarter,
 } from '../src/start-contractStarter.js';
 import { makeStableFaucet } from './mintStable.js';
+import { makeClientMarshaller } from '../src/marshalTables.js';
+import { documentStorageSchema } from './storageDoc.js';
 
 const nodeRequire = createRequire(import.meta.url);
 
@@ -139,4 +141,9 @@ test.serial('start launchIt instance to launch token', async t => {
   t.log('TODO: should fan figure out his share of the proceeds?');
   await E(larry).collect();
   await Promise.all(fans.map(fan => E(fan).redeem(instance)));
+
+  const m = makeClientMarshaller();
+  const storage = await powers.consume.chainStorage;
+  const note = `boardAux for launchIt, contractStarter instances`;
+  await documentStorageSchema(t, storage, { note, marshaller: m });
 });
