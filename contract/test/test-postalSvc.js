@@ -24,14 +24,14 @@ import {
 
 const { entries, fromEntries, keys } = Object;
 
+/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
+const test = anyTest;
+
 const nodeRequire = createRequire(import.meta.url);
 
 const bundleRoots = {
   postalSvc: nodeRequire.resolve('../src/postalSvc.js'),
 };
-
-/** @type {import('ava').TestFn<Awaited<ReturnType<makeBundleCacheContext>>>} */
-const test = anyTest;
 
 test.before(async t => (t.context = await makeBundleCacheContext(t)));
 
