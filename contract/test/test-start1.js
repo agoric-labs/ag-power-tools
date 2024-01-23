@@ -1,5 +1,5 @@
 // @ts-check
-import { test as anyTest } from '@agoric/zoe/tools/prepare-test-env-ava.js';
+import { test as anyTest } from './prepare-test-env-ava.js';
 import { E } from '@endo/far';
 import { AmountMath, AssetKind } from '@agoric/ertp';
 import { createRequire } from 'module';
