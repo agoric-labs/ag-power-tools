@@ -10,6 +10,7 @@
  *   - `permit` export is emitted as JSON
  */
 // @ts-check
+import nodeResolve from 'rollup-plugin-node-resolve';
 import {
   coreEvalGlobals,
   moduleToScript,
@@ -28,6 +29,7 @@ const config = {
   },
   external: ['@endo/far'],
   plugins: [
+    nodeResolve(),
     configureBundleID({
       name: 'contractStarter',
       rootModule: './src/contractStarter.js',
