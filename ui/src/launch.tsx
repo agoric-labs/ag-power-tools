@@ -24,6 +24,11 @@ export const Launch = () => {
         </label>
         <br />
         <label>
+          Deadline:
+          <input name="deadline" type="datetime-local" />
+        </label>
+        <br />
+        <label>
           Decimal Places:
           <input
             name="decimalPlaces"
