@@ -103,7 +103,11 @@ test('use contractStarter to start postalSvc', async t => {
       .getPostalSvcTerms()
       .then(customTerms =>
         E(sam)
-          .installAndStart({ label: 'postalSvc', ...id.postalSvc, customTerms })
+          .installAndStart({
+            instanceLabel: 'postalSvc',
+            ...id.postalSvc,
+            customTerms,
+          })
           .then(({ instance: postalSvc }) => {
             const terms = { postalSvc, destAddr: shared.destAddr };
             senderContract(t, { zoe, terms });
