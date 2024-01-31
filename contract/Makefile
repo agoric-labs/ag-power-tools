@@ -84,16 +84,49 @@ print-key: /root/.agoric/user1.key
 	@agd keys show user1 -a --keyring-backend="test"
 	@echo
 
-start-contract: start-game1.js start-game1-permit.json install-bundles
-	scripts/propose-start-contract.sh
+SCRIPT1=start-game1.js
+PERMIT1=start-game1-permit.json
+start-contract: $(SCRIPT1) $(PERMIT1) install-bundles
+	SCRIPT=$(SCRIPT1) PERMIT=$(PERMIT1) \
+	./scripts/propose-start-contract.sh
 
 install-bundles: bundles/bundle-list
 	./scripts/install-bundles.sh
+
+BUNDLE_INSTALLS=bundles/bundle-contractStarter.json.installed
+PERMIT2=bundles/deploy-starter-permit.json
+SCRIPT2=bundles/deploy-starter.js
+deploy-contract: $(SCRIPT2) $(PERMIT2) $(BUNDLE_INSTALLS)
+	SCRIPT=$(SCRIPT2) PERMIT=$(PERMIT2) TITLE="Deploy Starter Contract" \
+	./scripts/propose-start-contract.sh
 
 build-proposal: bundles/bundle-list
 
 bundles/bundle-list start-game1.js start-game1-permit.json:
 	./scripts/build-proposal.sh
+
+bundles/deploy-starter-permit.json  bundles/deploy-starter.js: rollup.config.mjs src/start-contractStarter.js
+	yarn rollup -c rollup.config.mjs src/start-contractStarter.js
+
+install-launchIt: bundles/bundle-launchIt.json.installed
+
+bundles/bundle-contractStarter.json.installed: bundles/bundle-contractStarter.json
+
+bundles/bundle-contractStarter.json: src/contractStarter.js src/boardAux.js
+	yarn --silent bundle-source --cache-json bundles/ src/contractStarter.js contractStarter
+
+bundles/bundle-launchIt.json: src/launchIt.js
+	yarn --silent bundle-source --cache-json bundles/ src/launchIt.js launchIt
+
+%.json.installed: %.json
+	ls -sh $<
+	agd tx swingset install-bundle --compress "@$<" \
+		-o json \
+		--from $(ACCT_ADDR) \
+		$(SIGN_BROADCAST_OPTS) >$@ || rm $@
+	@echo TODO: try agoric publish to better track outcome
+	jq '{bundleID: ("b1-" + .endoZipBase64Sha512)}' $<
+	jq '{code: .code, height: .height}' $@
 
 
 clean:

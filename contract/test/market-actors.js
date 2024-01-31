@@ -1,5 +1,6 @@
 // @ts-check
 import { E, getInterfaceOf } from '@endo/far';
+import { makePromiseKit } from '@endo/promise-kit';
 import { AmountMath } from '@agoric/ertp/src/amountMath.js';
 import { allValues, mapValues, seatLike } from './wallet-tools.js';
 
@@ -201,7 +202,8 @@ export const starterSam = async (t, mine, wellKnown) => {
   const expected = {
     result: 'UNPUBLISHED',
     payouts: {
-      Started: {
+      Fee: { brand: brand.IST, value: 0n },
+      Handles: {
         brand: brand.Invitation,
         value: [
           {
@@ -219,6 +221,35 @@ export const starterSam = async (t, mine, wellKnown) => {
     },
   };
 
+  let offerSeq = 0;
+  /** @param {{ bundleID: string, label?: string}} opts */
+  const install = async opts => {
+    const starterAux = await wellKnown.boardAux(instance.contractStarter);
+    const { prices } = starterAux.terms;
+    const { installBundleID: Fee } = prices;
+    t.log('sam gives', Fee, 'to install', opts.label);
+    const updates = await E(wallet.offers).executeOffer({
+      id: `install-${(offerSeq += 1)}`,
+      invitationSpec: {
+        source: 'contract',
+        instance: instance.contractStarter,
+        publicInvitationMaker: 'makeInstallInvitation',
+      },
+      proposal: { give: { Fee } },
+      offerArgs: opts,
+    });
+    const payouts = await E(seatLike(updates)).getPayouts();
+    t.log('sam install paid', payouts);
+    const {
+      value: [
+        {
+          customDetails: { installation },
+        },
+      ],
+    } = payouts.Handles;
+    return installation;
+  };
+
   const getPostalSvcTerms = async () => {
     const {
       terms: { namesByAddress },
@@ -228,36 +259,45 @@ export const starterSam = async (t, mine, wellKnown) => {
   };
 
   /**
-   * @template CT
-   * @param {{
-   *   bundleID?: string,
-   *   customTerms?: CT,
-   *   label?: string,
-   * }} opts
+   * @template SF
+   * @param {import('../src/contractStarter.js').StartOptions<SF>} opts
    */
   const installAndStart = async opts => {
-    t.log('Sam starts', opts.label, 'from', (opts.bundleID || '').slice(0, 8));
+    t.log(
+      'Sam starts',
+      opts.instanceLabel,
+      'from',
+      (opts.bundleID || '').slice(0, 8),
+    );
+    const starterAux = await wellKnown.boardAux(instance.contractStarter);
+    const { prices } = starterAux.terms;
+    const { add } = AmountMath;
+    const Fee = add(prices.installBundleID, prices.startInstance);
+    t.log('sam gives', Fee, 'to start', opts.instanceLabel);
+
     const updates = await E(wallet.offers).executeOffer({
-      id: 'samStart-1',
+      id: `samStart-${(offerSeq += 1)}`,
       invitationSpec: {
         source: 'contract',
         instance: instance.contractStarter,
         publicInvitationMaker: 'makeStartInvitation',
         invitationArgs: [opts],
       },
+      proposal: { give: { Fee } },
     });
 
     const seat = seatLike(updates);
 
     const result = await E(seat).getOfferResult();
-    checkKeys('Sam gets creatorFacet', result, expected.result);
+    t.log('Sam gets result', result);
+    t.is(result, expected.result);
 
     const payouts = await E(seat).getPayouts();
     checkKeys(undefined, payouts, expected.payouts);
-    const { Started } = payouts;
-    t.is(Started.brand, expected.payouts.Started.brand);
-    const details = first(Started.value);
-    const [details0] = expected.payouts.Started.value;
+    const { Handles } = payouts;
+    t.is(Handles.brand, expected.payouts.Handles.brand);
+    const details = first(Handles.value);
+    const [details0] = expected.payouts.Handles.value;
     checkKeys(undefined, details, details0);
     t.is(details.instance, details0.instance);
     checkKeys(
@@ -269,5 +309,159 @@ export const starterSam = async (t, mine, wellKnown) => {
     return details.customDetails;
   };
 
-  return { getPostalSvcTerms, installAndStart };
+  return { install, getPostalSvcTerms, installAndStart };
+};
+
+/**
+ * @param {import('ava').ExecutionContext} t
+ * @param {{
+ *   wallet: import('./wallet-tools.js').MockWallet
+ * }} mine
+ * @param {*} wellKnown
+ */
+export const launcherLarry = async (t, { wallet }, wellKnown) => {
+  const { timerService: timer } = wellKnown;
+  const timerBrand = await wellKnown.brand.timer;
+  const MNY = {
+    brand: await wellKnown.brand.MNY,
+    issuer: await wellKnown.issuer.MNY,
+  };
+
+  const instance = {
+    contractStarter: await wellKnown.instance.contractStarter,
+  };
+
+  let offerSeq = 0;
+  let launchOfferId;
+  const deadline = harden({ timerBrand, absValue: 10n });
+
+  const launch = async (
+    installation,
+    customTerms = { name: 'BRD', supplyQty: 1_000_000n },
+  ) => {
+    !launchOfferId || Fail`already launched`;
+
+    t.log('Larry prepares to launch', customTerms, 'at', deadline);
+    const { name } = customTerms;
+    const starterAux = await wellKnown.boardAux(instance.contractStarter);
+    const { startInstance } = starterAux.terms.prices;
+
+    const startOpts = {
+      instanceLabel: `${name}-launch`,
+      installation,
+      issuerKeywordRecord: { Deposit: MNY.issuer },
+      customTerms: { ...customTerms, deadline },
+    };
+    /** @type {import('@agoric/smart-wallet').OfferSpec} */
+
+    const id = `launch-${(offerSeq += 1)}`;
+    t.log('Larry pays', startInstance, 'to start', startOpts.label);
+    const updates = await E(wallet.offers).executeOffer({
+      id,
+      invitationSpec: {
+        source: 'contract',
+        instance: instance.contractStarter,
+        publicInvitationMaker: 'makeStartInvitation',
+        invitationArgs: [startOpts],
+      },
+      proposal: {
+        give: { Fee: startInstance },
+      },
+    });
+
+    const seat = seatLike(updates);
+    const result = await E(seat).getOfferResult();
+    t.log('larry launch result', result);
+    const { Handles } = await E(seat).getPayouts();
+    const { instance: launched } = Handles.value[0].customDetails;
+    t.log('larry launch instance', launched);
+    launchOfferId = id;
+
+    return launched;
+  };
+
+  const collect = async () => {
+    t.log('Larry collects at', deadline);
+    const id = `collect-${(offerSeq += 1)}`;
+    const up2 = await E(wallet.offers).executeOffer({
+      id,
+      invitationSpec: {
+        source: 'continuing',
+        previousOffer: launchOfferId,
+        invitationMakerName: 'Collect',
+      },
+      proposal: {
+        want: { Deposit: AmountMath.make(MNY.brand, 0n) },
+        exit: { afterDeadline: { timer, deadline } },
+      },
+    });
+    const seat = seatLike(up2);
+    const result = await E(seat).getOfferResult();
+    t.log('result', result);
+    const proceeds = await E(seat).getPayouts();
+    t.log('Larry collected', proceeds);
+  };
+  return { launch, collect };
+};
+
+/**
+ * @param {import('ava').ExecutionContext} t
+ * @param {{
+ *   wallet: import('./wallet-tools.js').MockWallet,
+ *   ix: number,
+ *   qty: bigint,
+ * }} mine
+ * @param {*} wk
+ */
+export const makeFan = (t, { wallet, ix, qty }, wk) => {
+  let offerSeq = 0;
+  const deposit = async instance => {
+    const { terms } = await wk.boardAux(instance);
+    const { brands, issuers } = terms;
+    // t.log(ix, 'fan found brands', brands);
+
+    await E(wallet.offers).addIssuer(issuers.Share);
+    await E(wallet.offers).addIssuer(issuers.BRD);
+
+    const updates = await E(wallet.offers).executeOffer({
+      id: `deposit-${(offerSeq += 1)}`,
+      invitationSpec: {
+        source: 'contract',
+        instance,
+        publicInvitationMaker: 'makeDepositInvitation',
+      },
+      proposal: {
+        give: { Deposit: AmountMath.make(brands.Deposit, qty) },
+        want: { Shares: AmountMath.make(brands.Share, qty) },
+      },
+    });
+    const seat = seatLike(updates);
+    const payouts = await E(seat).getPayouts();
+    t.log(ix, 'fan got', payouts.Shares);
+    return payouts.Shares;
+  };
+
+  const redeem = async instance => {
+    const { terms } = await wk.boardAux(instance);
+    const { brands } = terms;
+
+    const updates = await E(wallet.offers).executeOffer({
+      id: `redeem-${(offerSeq += 1)}`,
+      invitationSpec: {
+        source: 'contract',
+        instance,
+        publicInvitationMaker: 'makeRedeemInvitation',
+      },
+      proposal: {
+        give: { Shares: AmountMath.make(brands.Share, qty) },
+        want: { Minted: AmountMath.make(brands.BRD, 1n) },
+      },
+    });
+    const seat = seatLike(updates);
+    const payouts = await E(seat).getPayouts();
+    t.log(ix, 'fan got', payouts.Minted);
+    return payouts.Minted;
+  };
+
+  return { deposit, redeem };
 };

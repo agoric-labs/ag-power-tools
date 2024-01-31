@@ -50,14 +50,15 @@ export const installContractStarter = async (
 /** @typedef {{ brand: string} & ({ value: bigint } | { value: number, digits?: number })} AmountData */
 
 const free = { brand: 'IST', value: 0n };
+const fee = qty => ({ brand: 'IST', value: qty * 1_000_000n });
 /** @type {PriceConfig} */
 const defaultPrices = {
-  installBundleID: free,
-  startInstance: free,
-  storageNode: free,
-  timerService: free,
-  board: free,
-  priceAuthority: free,
+  installBundleID: fee(2n),
+  startInstance: fee(10n),
+  storageNode: fee(5n),
+  timerService: fee(4n),
+  board: fee(2n),
+  priceAuthority: fee(2n),
 };
 
 /**
