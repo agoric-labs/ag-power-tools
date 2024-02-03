@@ -1,9 +1,15 @@
 // @ts-check
 import { E, Far } from '@endo/far';
-import { M, mustMatch } from '@endo/patterns';
+import { M } from '@endo/patterns';
 import { withdrawFromSeat } from '@agoric/zoe/src/contractSupport/zoeHelpers.js';
+import { getTerms } from './contractMetaAux.js';
 
 const { keys, values } = Object;
+
+/** @type {import("./types").ContractMeta} */
+export const meta = harden({
+  customTermsShape: { namesByAddress: M.remotable('namesByAddress') },
+});
 
 /**
  * @typedef {object} PostalSvcTerms
@@ -12,8 +18,7 @@ const { keys, values } = Object;
 
 /** @param {ZCF<PostalSvcTerms>} zcf */
 export const start = zcf => {
-  const { namesByAddress, issuers } = zcf.getTerms();
-  mustMatch(namesByAddress, M.remotable('namesByAddress'));
+  const { namesByAddress, issuers } = getTerms(zcf, meta);
   console.log('postalSvc issuers', Object.keys(issuers));
 
   /**

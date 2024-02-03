@@ -1,7 +1,9 @@
 // @ts-check
 import { E, getInterfaceOf } from '@endo/far';
+import { makePromiseKit } from '@endo/promise-kit';
 import { AmountMath } from '@agoric/ertp/src/amountMath.js';
 import { allValues, mapValues } from './wallet-tools.js';
+import { makeIssuerKit } from '@agoric/ertp';
 
 const { entries, fromEntries, keys } = Object;
 const { Fail } = assert;
@@ -257,4 +259,51 @@ export const starterSam = async (t, mine, wellKnown) => {
   }
   t.deepEqual([...todo.keys()], []);
   return done;
+};
+
+const seatLike = updates => {
+  const sync = {
+    result: makePromiseKit(),
+    payouts: makePromiseKit(),
+  };
+  (async () => {
+    for await (const update of updates) {
+      if (update.updated !== 'offerStatus') continue;
+      const { result, payouts } = update.status;
+      if (result) sync.result.resolve(result);
+      if (payouts) sync.payouts.resolve(payouts);
+    }
+  })();
+  return harden({
+    getOfferResult: () => sync.result.promise,
+    getPayouts: () => sync.payouts.promise,
+  });
+};
+/**
+ * @param {import('ava').ExecutionContext} t
+ * @param {{ wallet: import('./wallet-tools.js').MockWallet }} mine
+ * @param { WellKnown & { terms: { arbAssetName: { price }}} } wellKnown
+ */
+export const launcherLarry = async (t, { wallet }, wellKnown) => {
+  const { price } = wellKnown.terms.arbAssetName;
+  const BRD = makeIssuerKit('BRD');
+  const launched = { issuer: BRD.issuer, brand: BRD.brand };
+  t.log('Larry launched', launched);
+  await E(wallet.offers).addIssuer(BRD.issuer);
+  const instance = await wellKnown.instance.arbAssetName;
+  t.log('Larry offers', price, 'to publish');
+  const updates = await E(wallet.offers).executeOffer({
+    id: 'larry-brd-publish-1',
+    invitationSpec: {
+      source: 'contract',
+      instance,
+      publicInvitationMaker: 'makePublishAssetInvitation',
+    },
+    proposal: { give: { Pay: price } },
+    offerArgs: launched,
+  });
+  const seat = seatLike(updates);
+  const id = await E(seat).getOfferResult();
+  t.log('Larry published as', id);
+  return { ...launched, id };
 };
