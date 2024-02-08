@@ -13,9 +13,11 @@
  */
 
 // @ts-check
+import '@endo/init/debug.js';
 import test from 'ava';
-import { makeMarshal } from '@endo/marshal';
-import { zip } from '../src/objectTools';
+import { Far, makeMarshal } from '@endo/marshal';
+import { makeNameHubKit } from '@agoric/vats';
+import { makeWellKnownSpaces } from '@agoric/vats/src/core/utils.js';
 
 const passThru = makeMarshal(undefined, undefined, {
   serializeBodyFormat: 'smallcaps',
@@ -55,7 +57,54 @@ const format = async (specimen, provideName) => {
   return harden({ body, slots });
 };
 
-test.todo('client can refer to $ag.brand.IST without vstorage query');
+test('client can refer to $ag.brand.IST without vstorage query', async t => {
+  const wk = makeNameHubKit(); // well known; aka agoricNames
+  const spaces = await makeWellKnownSpaces(wk.nameAdmin, t.log);
+  const istBrand = Far('IST brand mock', {});
+  spaces.brand.produce.IST.resolve(istBrand);
+
+  // gems have facets
+
+  const my = makeNameHubKit();
+  // A.$my.brand = A.$ag.brand
+  await my.nameAdmin.update('brand', wk.nameHub.lookup('brand'));
+
+  const bigintReplacer = (k, v) => (typeof v === 'bigint' ? `${v}` : v);
+  const lit = x => JSON.stringify(x, bigintReplacer);
+
+  const offerSpec = {
+    body: `#${lit({
+      proposal: {
+        give: { Price: { brand: '$0.Alleged IST Brand', value: 123n } },
+      },
+    })}`,
+    /** @type {PetSlot[]} */
+    slots: ['.$my.brand.IST'],
+  };
+
+  // A.$my.kread.characterBrand
+  // A.$my.kread.characterIssuer
+
+  // agoricNames.brand
+  // agoricNames.issuer
+
+  // agoricNames.asset.IST.brand
+  // agoricNames.asset.IST.issuer
+
+  // A.$my.kread.character.brand
+
+  // idea: a.thing.other js => lookup()
+  const walletHub = makeNameHubKit();
+  // A.wallet['$my'] = my
+  walletHub.nameAdmin.update('$my', my.nameHub);
+  walletHub.nameAdmin.update('$ag', wk.nameHub);
+
+  const x = await parse(offerSpec, (path, ...args) =>
+    walletHub.nameHub.lookup(...path.slice(1).split('.'), ...args),
+  );
+  t.log(x.proposal);
+});
+
 test.todo('walletFactory marshals IST using $ag.brand.IST? or boardID?');
 test.todo('client can add an issuer by setting issuer.my.BRD');
 test.todo('client can add issuers by referring to them in a new offer field');
